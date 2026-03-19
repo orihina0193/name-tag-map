@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>避難所レイアウト v23.0</title>
+    <style>
+        :root { --top-h: 75px; --bot-h: 280px; }
+        body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; }
+        canvas { display: block; background: #f0f0f0; }
+        #top-panel { position: absolute; top: 0; width: 100%; height: var(--top-h); background: rgba(255,255,255,0.9); border-bottom: 1px solid #ccc; display: flex; align-items: center; padding: 0 10px; box-sizing: border-box; z-index: 100; overflow-x: auto; }
+        #item-list { display: flex; gap: 8px; align-items: center; }
+        .thumb { width: 50px; height: 50px; border-radius: 6px; border: 2px solid #ccc; background-size: contain; background-repeat: no-repeat; background-position: center; background-color: #fff; flex-shrink: 0; }
+        .thumb.selected { border-color: #007aff; border-width: 3px; }
+        #upload-label { width: 50px; height: 50px; border: 2px dashed #bbb; border-radius: 6px; display: flex; justify-content: center; align-items: center; font-size: 20px; color: #999; flex-shrink: 0; background: #fff; }
+        #bot-panel { position: absolute; bottom: 0; width: 100%; height: var(--bot-h); background: rgba(255,255,255,0.98); border-top: 1px solid #ccc; padding: 10px; box-sizing: border-box; z-index: 100; display: flex; flex-direction: column; gap: 8px; }
+        .row { display: flex; align-items: center; gap: 6px; }
+        .row label { font-size: 11px; font-weight: bold; width: 35px; }
+        input[type="range"] { flex: 1; height: 30px; }
+        .prec-btn { width: 38px; height: 35px; font-size: 18px; border: 1px solid #ccc; background: #fff; border-radius: 6px; }
+        #nudge-grid { display: grid; grid-template-columns: repeat(3, 38px); gap: 4px; }
+        #nudge-grid button { height: 38px; font-size: 18px; border: 1px solid #ccc; background: #fff; border-radius: 8px; }
+        .mode-box { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+        .mode-row { display: flex; gap: 4px; }
+        .mode-row button { flex: 1; height: 38px; font-size: 11px; font-weight: bold; border-radius: 8px; border: 1px solid #ccc; background: #fff; }
+        .mode-row button.active { background: #007aff; color: #fff; border-color: #004da3; }
+        #m-name.active { background: #34c759; border-color: #248a3d; }
+        #m-erase.active { background: #ff3b30; border-color: #c41e16; }
+        #name-input-ui { display: none; background: #f9f9f9; padding: 8px; border-radius: 8px; border: 1px solid #ccc; position: absolute; bottom: 290px; left: 10px; right: 10px; z-index: 200; box-shadow: 0 -5px 15px rgba(0,0,0,0.1); }
+        #name-area { width: 100%; height: 60px; font-size: 12px; margin-bottom: 5px; }
+        #zoom-tag { position: absolute; top: 85px; right: 10px; background: rgba(0,0,0,0.6); color: #fff; padding: 4px 10px; border-radius: 12px; font-size: 12px; z-index: 50; }
+    </style>
+</head>
+<body>
+<canvas id="cvs"></canvas>
+<div id="zoom-tag">Zoom: 100%</div>
+<div id="name-input-ui">
+    <textarea id="name-area" placeholder="名前を改行かカンマで入力 (例: Ikumi, ジェマ...)"></textarea>
+    <button onclick="importNames()" style="width:100%; height:35px; background:#34c759; color:white; border:none; border-radius:5px; font-weight:bold;">名前リストを確定</button>
+</div>
+<div id="top-panel"><div id="item-list"><button class="thumb" onclick="deselect()" style="font-size:10px;font-weight:bold;">解除</button><label id="upload-label">＋<input type="file" id="img-in" hidden accept="image/*" multiple></label></div></div>
+<div id="bot-panel">
+    <div class="row"><label>サイズ</label><button class="prec-btn" onclick="adjS(-0.1)">-</button><input type="range" id="size-s" min="0.1" max="5" step="0.1" value="1"><button class="prec-btn" onclick="adjS(0.1)">+</button></div>
+    <div class="row"><label>接地</label><button class="prec-btn" onclick="adjO(-1)">-</button><input type="range" id="off-s" min="-100" max="100" step="1" value="0"><button class="prec-btn" onclick="adjO(1)">+</button></div>
+    <div style="display:flex; gap:10px; align-items:flex-start;">
+        <div id="nudge-grid"><span></span><button onclick="nudge(0,-0.1)">↑</button><span></span><button onclick="nudge(-0.1,0)">←</button><button onclick="nudge(0,0.1)">↓</button><button onclick="nudge(0.1,0)">→</button></div>
+        <div class="mode-box">
+            <div class="mode-row"><button id="m-move">移動</button><button id="m-pen">ペン</button><button id="m-erase">消去</button></div>
+            <div class="mode-row"><button id="m-name">名前配置</button><button onclick="clearAll()" style="color:#d32f2f">リセット</button></div>
+        </div>
+    </div>
+</div>
+<script>
+const cvs = document.getElementById('cvs'); const ctx = cvs.getContext('2d');
+const sizeS = document.getElementById('size-s'); const offS = document.getElementById('off-s');
+const T_W = 64, T_H = 32;
+let cam = { x: window.innerWidth/2, y: window.innerHeight/3, z: 1 };
+let assets = [], map = [], edgeLines = [], selIdx = -1, activeAsset = -1, mode = 'move';
+let nameQueue = [], activeName = null;
+let drag = false, pinch = false, lastDist = 0, lastMid = {x:0, y:0}, lastT = {x:0, y:0}, touchStartTime = 0, hasMoved = false, isClickReady = false;
+
+function init() { cvs.width = window.innerWidth; cvs.height = window.innerHeight; load(); setMode('move'); render(); }
+const toS = (gx, gy) => ({ x: (gx - gy) * (T_W/2), y: (gx + gy) * (T_H/2) });
+const toG = (sx, sy) => {
+    let x = (sx - cam.x)/cam.z, y = (sy - cam.y)/cam.z;
+    let gy = (y/(T_H/2) - x/(T_W/2))/2; return { x: x/(T_W/2) + gy, y: gy };
+};
+
+function render() {
+    ctx.clearRect(0,0,cvs.width,cvs.height);
+    ctx.save(); ctx.translate(cam.x, cam.y); ctx.scale(cam.z, cam.z);
+    ctx.strokeStyle = "rgba(0,0,0,0.08)"; ctx.lineWidth = 1;
+    for(let i=-20; i<=40; i++){
+        let s = toS(i,-20), e = toS(i,40); ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(e.x,e.y); ctx.stroke();
+        s = toS(-20,i); e = toS(40,i); ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(e.x,e.y); ctx.stroke();
+    }
+    let drawList = [];
+    map.forEach((d, i) => drawList.push({ type: 'obj', data: d, sort: d.x + d.y + (d.isName?0.1:0), originalIdx: i }));
+    edgeLines.forEach((l, i) => drawList.push({ type: 'line', data: l, sort: Math.max(l.x1, l.x2) + Math.max(l.y1, l.y2), originalIdx: i }));
+    drawList.sort((a, b) => a.sort - b.sort);
+    drawList.forEach(obj => {
+        if(obj.type === 'obj') {
+            const d = obj.data;
+            if(d.isName) {
+                ctx.fillStyle = "rgba(0,0,0,0.7)"; ctx.font = `bold ${14 * d.s}px sans-serif`;
+                let tw = ctx.measureText(d.name).width; let p = toS(d.x, d.y);
+                ctx.fillRect(p.x - tw/2 - 4, p.y - 10*d.s, tw + 8, 20*d.s);
+                ctx.fillStyle = "white"; ctx.textAlign = "center"; ctx.fillText(d.name, p.x, p.y + 5*d.s);
+                if(selIdx === obj.originalIdx) { ctx.strokeStyle = "#007aff"; ctx.strokeRect(p.x - tw/2 - 6, p.y - 12*d.s, tw + 12, 24*d.s); }
+            } else {
+                const a = assets[d.aIdx]; if(!a) return;
+                const w = T_W * d.s; const h = (a.img.height/a.img.width) * w;
+                const anchor = toS(d.x + 1, d.y + 1);
+                ctx.drawImage(a.img, anchor.x - w/2, anchor.y - h + (a.off || 0), w, h);
+                if(selIdx === obj.originalIdx) {
+                    ctx.strokeStyle = "#007aff"; ctx.lineWidth = 2;
+                    let pS = anchor, pW = {x:anchor.x-(T_W/2)*d.s, y:anchor.y-(T_H/2)*d.s}, pE = {x:anchor.x+(T_W/2)*d.s, y:anchor.y-(T_H/2)*d.s}, pN = {x:anchor.x, y:anchor.y-T_H*d.s};
+                    ctx.beginPath(); ctx.moveTo(pS.x,pS.y); ctx.lineTo(pW.x,pW.y); ctx.lineTo(pN.x,pN.y); ctx.lineTo(pE.x,pE.y); ctx.closePath(); ctx.stroke();
+                }
+            }
+        } else {
+            const l = obj.data; ctx.strokeStyle = "#ff3b30"; ctx.lineWidth = 3; ctx.lineCap = "round";
+            let p1 = toS(l.x1, l.y1), p2 = toS(l.x2, l.y2); ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+        }
+    });
+    ctx.restore();
+}
+
+cvs.addEventListener('touchstart', e => {
+    touchStartTime = Date.now(); hasMoved = false; isClickReady = true;
+    if(e.touches.length >= 2) { pinch = true; drag = false; isClickReady = false;
+        lastDist = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+        lastMid = {x:(e.touches[0].clientX+e.touches[1].clientX)/2, y:(e.touches[0].clientY+e.touches[1].clientY)/2};
+        return;
+    }
+    drag = true; lastT = {x: e.touches[0].clientX, y: e.touches[0].clientY};
+}, {passive: false});
+
+cvs.addEventListener('touchmove', e => {
+    e.preventDefault(); const t = e.touches[0];
+    if(Math.hypot(t.clientX - lastT.x, t.clientY - lastT.y) > 10) { hasMoved = true; isClickReady = false; }
+    if(pinch && e.touches.length >= 2) {
+        let d = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+        let m = {x:(e.touches[0].clientX+e.touches[1].clientX)/2, y:(e.touches[0].clientY+e.touches[1].clientY)/2};
+        let f = d / lastDist; cam.x = m.x - (m.x - cam.x)*f + (m.x - lastMid.x); cam.y = m.y - (m.y - cam.y)*f + (m.y - lastMid.y);
+        cam.z *= f; lastDist = d; lastMid = m; document.getElementById('zoom-tag').innerText = "Zoom: "+Math.round(cam.z*100)+"%";
+    } else if(drag) {
+        if(mode === 'move' && activeAsset === -1) { cam.x += (t.clientX - lastT.x); cam.y += (t.clientY - lastT.y); }
+        else if(mode === 'pen') {
+            const g = toG(t.clientX, t.clientY); const prevG = toG(lastT.x, lastT.y);
+            addEdgeLine(Math.round(prevG.x), Math.round(prevG.y), Math.round(g.x), Math.round(g.y));
+        }
+    }
+    lastT = {x: t.clientX, y: t.clientY}; render();
+}, {passive: false});
+
+cvs.addEventListener('touchend', e => {
+    if(!pinch && isClickReady && !hasMoved) {
+        const g = toG(lastT.x, lastT.y);
+        if(mode === 'move') {
+            if(activeAsset !== -1) { map.push({x:Math.floor(g.x), y:Math.floor(g.y), aIdx:activeAsset, s:parseFloat(sizeS.value)}); selIdx = map.length-1; }
+            else {
+                let h = map.findLastIndex(d => Math.abs(g.x - (d.x+(d.isName?0:0.5))) < 1 && Math.abs(g.y - (d.y+(d.isName?0:0.5))) < 1);
+                if(h !== -1) { selIdx = h; sizeS.value = map[h].s; } else { selIdx = -1; }
+            }
+        } else if(mode === 'name' && activeName) {
+            map.push({x:g.x, y:g.y, name:activeName, isName:true, s:parseFloat(sizeS.value)});
+            selIdx = map.length - 1; pickNextName();
+        } else if(mode === 'erase') {
+            let h = map.findLastIndex(d => Math.abs(g.x - (d.x+(d.isName?0:0.5))) < 1 && Math.abs(g.y - (d.y+(d.isName?0:0.5))) < 1);
+            if(h !== -1) map.splice(h, 1);
+        }
+    }
+    drag = pinch = false; save(); render();
+});
+
+function addEdgeLine(x1, y1, x2, y2) {
+    if(x1===x2 && y1===y2) return;
+    const key = [x1,y1,x2,y2].sort((a,b)=>a-b).join(',');
+    if(!edgeLines.some(l => [l.x1,l.y1,l.x2,l.y2].sort((a,b)=>a-b).join(',') === key)) edgeLines.push({x1, y1, x2, y2});
+}
+window.deselect = () => { activeAsset = -1; selIdx = -1; document.querySelectorAll('.thumb').forEach(t=>t.classList.remove('selected')); render(); };
+function setMode(m) {
+    mode = m; selIdx = -1; if(m!=='move') activeAsset = -1;
+    ['m-move','m-pen','m-erase','m-name'].forEach(id => document.getElementById(id).className = id===`m-${m}`?'active':'');
+    document.getElementById('name-input-ui').style.display = m==='name'?'block':'none';
+    if(m==='name') pickNextName();
+    render();
+}
+document.getElementById('m-move').onclick = () => setMode('move');
+document.getElementById('m-pen').onclick = () => setMode('pen');
+document.getElementById('m-erase').onclick = () => setMode('erase');
+document.getElementById('m-name').onclick = () => setMode('name');
+
+function importNames() {
+    const txt = document.getElementById('name-area').value;
+    nameQueue = txt.split(/[\n,、]+/).map(s => s.trim()).filter(s => s.length > 0);
+    pickNextName();
+}
+function pickNextName() {
+    activeName = nameQueue.length > 0 ? nameQueue.shift() : null;
+    document.getElementById('m-name').innerText = activeName ? `次: ${activeName}` : "名前リスト空";
+}
+
+document.getElementById('img-in').onchange = (e) => {
+    for(let f of e.target.files) {
+        const r = new FileReader(); r.onload = (ev) => {
+            const i = new Image(); i.onload = () => {
+                const src = crop(i); const i2 = new Image();
+                i2.onload = () => { assets.push({img:i2, src, off:0}); addThumb(assets.length-1); save(); }; i2.src = src;
+            }; i.src = ev.target.result;
+        }; r.readAsDataURL(f);
+    }
+};
+function crop(img) {
+    const c = document.createElement('canvas'); const t = c.getContext('2d');
+    c.width = img.width; c.height = img.height; t.drawImage(img,0,0);
+    const d = t.getImageData(0,0,c.width,c.height).data;
+    let x1=c.width, y1=c.height, x2=0, y2=0;
+    for(let y=0; y<c.height; y++) for(let x=0; x<c.width; x++) if(d[(y*c.width+x)*4+3]>10){ x1=Math.min(x1,x); y1=Math.min(y1,y); x2=Math.max(x2,x); y2=Math.max(y2,y); }
+    const w = x2-x1+1, h = y2-y1+1; const c2 = document.createElement('canvas'); c2.width = w; c2.height = h;
+    c2.getContext('2d').drawImage(img,x1,y1,w,h,0,0,w,h); return c2.toDataURL();
+}
+function addThumb(idx) {
+    const d = document.createElement('div'); d.className = 'thumb'; d.style.backgroundImage = `url(${assets[idx].src})`;
+    d.onclick = () => { setMode('move'); document.querySelectorAll('.thumb').forEach(t=>t.classList.remove('selected')); d.classList.add('selected'); activeAsset=idx; render(); };
+    document.getElementById('item-list').insertBefore(d, document.getElementById('upload-label'));
+}
+function save() { localStorage.setItem('map_v23', JSON.stringify({m:map, el:edgeLines, a:assets.map(a=>({src:a.src, off:a.off}))})); }
+function load() {
+    const s = localStorage.getItem('map_v23'); if(!s) return;
+    const d = JSON.parse(s); map = d.m || []; edgeLines = d.el || [];
+    d.a.forEach((ad, i) => { const img = new Image(); img.onload = () => { assets[i]={img, src:ad.src, off:ad.off}; addThumb(i); render(); }; img.src = ad.src; });
+}
+window.nudge = (dx,dy) => { if(selIdx!==-1){ map[selIdx].x+=dx; map[selIdx].y+=dy; render(); save(); } };
+window.adjS = (v) => { if(selIdx!==-1){ let n=parseFloat(sizeS.value)+v; n=Math.max(0.1,n); sizeS.value=n; map[selIdx].s=n; render(); save(); } };
+window.adjO = (v) => { let idx=(selIdx!==-1)?map[selIdx].aIdx:activeAsset; if(idx!==-1 && assets[idx]){ assets[idx].off+=v; offS.value=assets[idx].off; render(); save(); } };
+window.clearAll = () => { if(confirm("消去しますか？")){ localStorage.clear(); location.reload(); } };
+init();
+</script>
+</body>
+</html>
