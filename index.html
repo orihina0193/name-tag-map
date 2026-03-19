@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v23.0</title>
+    <title>避難所レイアウト v23.1</title>
     <style>
         :root { --top-h: 75px; --bot-h: 280px; }
         body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; }
@@ -24,10 +24,9 @@
         .mode-row { display: flex; gap: 4px; }
         .mode-row button { flex: 1; height: 38px; font-size: 11px; font-weight: bold; border-radius: 8px; border: 1px solid #ccc; background: #fff; }
         .mode-row button.active { background: #007aff; color: #fff; border-color: #004da3; }
-        #m-name.active { background: #34c759; border-color: #248a3d; }
-        #m-erase.active { background: #ff3b30; border-color: #c41e16; }
-        #name-input-ui { display: none; background: #f9f9f9; padding: 8px; border-radius: 8px; border: 1px solid #ccc; position: absolute; bottom: 290px; left: 10px; right: 10px; z-index: 200; box-shadow: 0 -5px 15px rgba(0,0,0,0.1); }
-        #name-area { width: 100%; height: 60px; font-size: 12px; margin-bottom: 5px; }
+        #m-name.active { background: #34c759; border-color: #248a3d; color: white; }
+        #name-input-ui { display: none; background: #fff; padding: 15px; border-radius: 12px; border: 2px solid #007aff; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 85%; z-index: 1000; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+        #name-area { width: 100%; height: 120px; font-size: 14px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; padding: 8px; box-sizing: border-box; }
         #zoom-tag { position: absolute; top: 85px; right: 10px; background: rgba(0,0,0,0.6); color: #fff; padding: 4px 10px; border-radius: 12px; font-size: 12px; z-index: 50; }
     </style>
 </head>
@@ -35,10 +34,13 @@
 <canvas id="cvs"></canvas>
 <div id="zoom-tag">Zoom: 100%</div>
 <div id="name-input-ui">
-    <textarea id="name-area" placeholder="名前を改行かカンマで入力 (例: Ikumi, ジェマ...)"></textarea>
-    <button onclick="importNames()" style="width:100%; height:35px; background:#34c759; color:white; border:none; border-radius:5px; font-weight:bold;">名前リストを確定</button>
+    <div style="font-weight:bold; margin-bottom:10px; font-size:14px;">名前リストを入力 (改行orカンマ区切り)</div>
+    <textarea id="name-area" placeholder="例:&#10;Ikumi&#10;ジェマ&#10;佐藤..."></textarea>
+    <button onclick="importNames()" style="width:100%; height:45px; background:#007aff; color:white; border:none; border-radius:8px; font-weight:bold; font-size:16px;">この100人を配置する！</button>
+    <button onclick="document.getElementById('name-input-ui').style.display='none'" style="width:100%; margin-top:8px; background:none; border:none; color:#666; font-size:12px;">キャンセル</button>
 </div>
-<div id="top-panel"><div id="item-list"><button class="thumb" onclick="deselect()" style="font-size:10px;font-weight:bold;">解除</button><label id="upload-label">＋<input type="file" id="img-in" hidden accept="image/*" multiple></label></div></div>
+
+<div id="top-panel"><div id="item-list"><button class="thumb" onclick="deselect()" style="font-size:10px;font-weight:bold;">選択<br>解除</button><label id="upload-label">＋<input type="file" id="img-in" hidden accept="image/*" multiple></label></div></div>
 <div id="bot-panel">
     <div class="row"><label>サイズ</label><button class="prec-btn" onclick="adjS(-0.1)">-</button><input type="range" id="size-s" min="0.1" max="5" step="0.1" value="1"><button class="prec-btn" onclick="adjS(0.1)">+</button></div>
     <div class="row"><label>接地</label><button class="prec-btn" onclick="adjO(-1)">-</button><input type="range" id="off-s" min="-100" max="100" step="1" value="0"><button class="prec-btn" onclick="adjO(1)">+</button></div>
@@ -82,13 +84,14 @@ function render() {
         if(obj.type === 'obj') {
             const d = obj.data;
             if(d.isName) {
-                ctx.fillStyle = "rgba(0,0,0,0.7)"; ctx.font = `bold ${14 * d.s}px sans-serif`;
+                ctx.font = `bold ${14 * d.s}px sans-serif`;
                 let tw = ctx.measureText(d.name).width; let p = toS(d.x, d.y);
-                ctx.fillRect(p.x - tw/2 - 4, p.y - 10*d.s, tw + 8, 20*d.s);
-                ctx.fillStyle = "white"; ctx.textAlign = "center"; ctx.fillText(d.name, p.x, p.y + 5*d.s);
-                if(selIdx === obj.originalIdx) { ctx.strokeStyle = "#007aff"; ctx.strokeRect(p.x - tw/2 - 6, p.y - 12*d.s, tw + 12, 24*d.s); }
+                ctx.fillStyle = "rgba(0,0,0,0.7)";
+                ctx.fillRect(p.x - tw/2 - 4, p.y - 12*d.s, tw + 8, 20*d.s);
+                ctx.fillStyle = "white"; ctx.textAlign = "center"; ctx.fillText(d.name, p.x, p.y + 3*d.s);
+                if(selIdx === obj.originalIdx) { ctx.strokeStyle = "#007aff"; ctx.lineWidth=2; ctx.strokeRect(p.x - tw/2 - 6, p.y - 14*d.s, tw + 12, 24*d.s); }
             } else {
-                const a = assets[d.aIdx]; if(!a) return;
+                const a = assets[d.aIdx]; if(!a || !a.img) return;
                 const w = T_W * d.s; const h = (a.img.height/a.img.width) * w;
                 const anchor = toS(d.x + 1, d.y + 1);
                 ctx.drawImage(a.img, anchor.x - w/2, anchor.y - h + (a.off || 0), w, h);
@@ -108,12 +111,13 @@ function render() {
 
 cvs.addEventListener('touchstart', e => {
     touchStartTime = Date.now(); hasMoved = false; isClickReady = true;
+    const t = e.touches[0]; lastT = {x: t.clientX, y: t.clientY};
     if(e.touches.length >= 2) { pinch = true; drag = false; isClickReady = false;
         lastDist = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
         lastMid = {x:(e.touches[0].clientX+e.touches[1].clientX)/2, y:(e.touches[0].clientY+e.touches[1].clientY)/2};
         return;
     }
-    drag = true; lastT = {x: e.touches[0].clientX, y: e.touches[0].clientY};
+    drag = true;
 }, {passive: false});
 
 cvs.addEventListener('touchmove', e => {
@@ -135,7 +139,7 @@ cvs.addEventListener('touchmove', e => {
 }, {passive: false});
 
 cvs.addEventListener('touchend', e => {
-    if(!pinch && isClickReady && !hasMoved) {
+    if(!pinch && isClickReady && !hasMoved && (Date.now() - touchStartTime < 300)) {
         const g = toG(lastT.x, lastT.y);
         if(mode === 'move') {
             if(activeAsset !== -1) { map.push({x:Math.floor(g.x), y:Math.floor(g.y), aIdx:activeAsset, s:parseFloat(sizeS.value)}); selIdx = map.length-1; }
@@ -143,9 +147,15 @@ cvs.addEventListener('touchend', e => {
                 let h = map.findLastIndex(d => Math.abs(g.x - (d.x+(d.isName?0:0.5))) < 1 && Math.abs(g.y - (d.y+(d.isName?0:0.5))) < 1);
                 if(h !== -1) { selIdx = h; sizeS.value = map[h].s; } else { selIdx = -1; }
             }
-        } else if(mode === 'name' && activeName) {
-            map.push({x:g.x, y:g.y, name:activeName, isName:true, s:parseFloat(sizeS.value)});
-            selIdx = map.length - 1; pickNextName();
+        } else if(mode === 'name') {
+            if(activeName) {
+                map.push({x:g.x, y:g.y, name:activeName, isName:true, s:parseFloat(sizeS.value)});
+                selIdx = map.length - 1; pickNextName();
+            } else {
+                // 名前がない場合は選択モードとして動く
+                let h = map.findLastIndex(d => d.isName && Math.abs(g.x - d.x) < 1 && Math.abs(g.y - d.y) < 1);
+                if(h !== -1) { selIdx = h; sizeS.value = map[h].s; } else { selIdx = -1; }
+            }
         } else if(mode === 'erase') {
             let h = map.findLastIndex(d => Math.abs(g.x - (d.x+(d.isName?0:0.5))) < 1 && Math.abs(g.y - (d.y+(d.isName?0:0.5))) < 1);
             if(h !== -1) map.splice(h, 1);
@@ -163,8 +173,13 @@ window.deselect = () => { activeAsset = -1; selIdx = -1; document.querySelectorA
 function setMode(m) {
     mode = m; selIdx = -1; if(m!=='move') activeAsset = -1;
     ['m-move','m-pen','m-erase','m-name'].forEach(id => document.getElementById(id).className = id===`m-${m}`?'active':'');
-    document.getElementById('name-input-ui').style.display = m==='name'?'block':'none';
-    if(m==='name') pickNextName();
+    if(m==='name') {
+        if(nameQueue.length === 0 && !activeName) {
+            document.getElementById('name-input-ui').style.display = 'block';
+        }
+    } else {
+        document.getElementById('name-input-ui').style.display = 'none';
+    }
     render();
 }
 document.getElementById('m-move').onclick = () => setMode('move');
@@ -174,12 +189,15 @@ document.getElementById('m-name').onclick = () => setMode('name');
 
 function importNames() {
     const txt = document.getElementById('name-area').value;
-    nameQueue = txt.split(/[\n,、]+/).map(s => s.trim()).filter(s => s.length > 0);
+    if(!txt.trim()) return;
+    nameQueue = txt.split(/[\n,、\t]+/).map(s => s.trim()).filter(s => s.length > 0);
+    document.getElementById('name-input-ui').style.display = 'none'; // 窓を閉じる
     pickNextName();
+    render();
 }
 function pickNextName() {
     activeName = nameQueue.length > 0 ? nameQueue.shift() : null;
-    document.getElementById('m-name').innerText = activeName ? `次: ${activeName}` : "名前リスト空";
+    document.getElementById('m-name').innerText = activeName ? `次: ${activeName}` : "名前配置";
 }
 
 document.getElementById('img-in').onchange = (e) => {
