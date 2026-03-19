@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v23.1</title>
+    <title>避難所レイアウト v23.2</title>
     <style>
         :root { --top-h: 75px; --bot-h: 280px; }
         body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; }
@@ -34,17 +34,17 @@
 <canvas id="cvs"></canvas>
 <div id="zoom-tag">Zoom: 100%</div>
 <div id="name-input-ui">
-    <div style="font-weight:bold; margin-bottom:10px; font-size:14px;">名前リストを入力 (改行orカンマ区切り)</div>
-    <textarea id="name-area" placeholder="例:&#10;Ikumi&#10;ジェマ&#10;佐藤..."></textarea>
-    <button onclick="importNames()" style="width:100%; height:45px; background:#007aff; color:white; border:none; border-radius:8px; font-weight:bold; font-size:16px;">この100人を配置する！</button>
-    <button onclick="document.getElementById('name-input-ui').style.display='none'" style="width:100%; margin-top:8px; background:none; border:none; color:#666; font-size:12px;">キャンセル</button>
+    <div style="font-weight:bold; margin-bottom:10px; font-size:14px;">名前リスト(98人でもOK!)</div>
+    <textarea id="name-area" placeholder="名前を貼り付け..."></textarea>
+    <button onclick="importNames()" style="width:100%; height:45px; background:#007aff; color:white; border:none; border-radius:8px; font-weight:bold;">確定して配置開始</button>
+    <button onclick="document.getElementById('name-input-ui').style.display='none'" style="width:100%; margin-top:8px; background:none; border:none; color:#666;">キャンセル</button>
 </div>
 
 <div id="top-panel"><div id="item-list"><button class="thumb" onclick="deselect()" style="font-size:10px;font-weight:bold;">選択<br>解除</button><label id="upload-label">＋<input type="file" id="img-in" hidden accept="image/*" multiple></label></div></div>
 <div id="bot-panel">
     <div class="row"><label>サイズ</label><button class="prec-btn" onclick="adjS(-0.1)">-</button><input type="range" id="size-s" min="0.1" max="5" step="0.1" value="1"><button class="prec-btn" onclick="adjS(0.1)">+</button></div>
     <div class="row"><label>接地</label><button class="prec-btn" onclick="adjO(-1)">-</button><input type="range" id="off-s" min="-100" max="100" step="1" value="0"><button class="prec-btn" onclick="adjO(1)">+</button></div>
-    <div style="display:flex; gap:10px; align-items:flex-start;">
+    <div style="display:flex; gap:10px;">
         <div id="nudge-grid"><span></span><button onclick="nudge(0,-0.1)">↑</button><span></span><button onclick="nudge(-0.1,0)">←</button><button onclick="nudge(0,0.1)">↓</button><button onclick="nudge(0.1,0)">→</button></div>
         <div class="mode-box">
             <div class="mode-row"><button id="m-move">移動</button><button id="m-pen">ペン</button><button id="m-erase">消去</button></div>
@@ -54,12 +54,12 @@
 </div>
 <script>
 const cvs = document.getElementById('cvs'); const ctx = cvs.getContext('2d');
-const sizeS = document.getElementById('size-s'); const offS = document.getElementById('off-s');
+const sizeS = document.getElementById('size-s');
 const T_W = 64, T_H = 32;
 let cam = { x: window.innerWidth/2, y: window.innerHeight/3, z: 1 };
 let assets = [], map = [], edgeLines = [], selIdx = -1, activeAsset = -1, mode = 'move';
-let nameQueue = [], activeName = null;
-let drag = false, pinch = false, lastDist = 0, lastMid = {x:0, y:0}, lastT = {x:0, y:0}, touchStartTime = 0, hasMoved = false, isClickReady = false;
+let nameQueue = [], activeName = null, isDraggingObject = false;
+let drag = false, pinch = false, lastDist = 0, lastMid = {x:0, y:0}, lastT = {x:0, y:0}, touchStartTime = 0;
 
 function init() { cvs.width = window.innerWidth; cvs.height = window.innerHeight; load(); setMode('move'); render(); }
 const toS = (gx, gy) => ({ x: (gx - gy) * (T_W/2), y: (gx + gy) * (T_H/2) });
@@ -73,8 +73,8 @@ function render() {
     ctx.save(); ctx.translate(cam.x, cam.y); ctx.scale(cam.z, cam.z);
     ctx.strokeStyle = "rgba(0,0,0,0.08)"; ctx.lineWidth = 1;
     for(let i=-20; i<=40; i++){
-        let s = toS(i,-20), e = toS(i,40); ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(e.x,e.y); ctx.stroke();
-        s = toS(-20,i); e = toS(40,i); ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(e.x,e.y); ctx.stroke();
+        let s1 = toS(i,-20), e1 = toS(i,40); ctx.beginPath(); ctx.moveTo(s1.x,s1.y); ctx.lineTo(e1.x,e1.y); ctx.stroke();
+        let s2 = toS(-20,i), e2 = toS(40,i); ctx.beginPath(); ctx.moveTo(s2.x,s2.y); ctx.lineTo(e2.x,e2.y); ctx.stroke();
     }
     let drawList = [];
     map.forEach((d, i) => drawList.push({ type: 'obj', data: d, sort: d.x + d.y + (d.isName?0.1:0), originalIdx: i }));
@@ -95,8 +95,7 @@ function render() {
                 const w = T_W * d.s; const h = (a.img.height/a.img.width) * w;
                 const anchor = toS(d.x + 1, d.y + 1);
                 ctx.drawImage(a.img, anchor.x - w/2, anchor.y - h + (a.off || 0), w, h);
-                if(selIdx === obj.originalIdx) {
-                    ctx.strokeStyle = "#007aff"; ctx.lineWidth = 2;
+                if(selIdx === obj.originalIdx) { ctx.strokeStyle = "#007aff"; ctx.lineWidth = 2;
                     let pS = anchor, pW = {x:anchor.x-(T_W/2)*d.s, y:anchor.y-(T_H/2)*d.s}, pE = {x:anchor.x+(T_W/2)*d.s, y:anchor.y-(T_H/2)*d.s}, pN = {x:anchor.x, y:anchor.y-T_H*d.s};
                     ctx.beginPath(); ctx.moveTo(pS.x,pS.y); ctx.lineTo(pW.x,pW.y); ctx.lineTo(pN.x,pN.y); ctx.lineTo(pE.x,pE.y); ctx.closePath(); ctx.stroke();
                 }
@@ -110,58 +109,55 @@ function render() {
 }
 
 cvs.addEventListener('touchstart', e => {
-    touchStartTime = Date.now(); hasMoved = false; isClickReady = true;
+    touchStartTime = Date.now();
     const t = e.touches[0]; lastT = {x: t.clientX, y: t.clientY};
-    if(e.touches.length >= 2) { pinch = true; drag = false; isClickReady = false;
+    if(e.touches.length >= 2) { pinch = true; drag = false;
         lastDist = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
         lastMid = {x:(e.touches[0].clientX+e.touches[1].clientX)/2, y:(e.touches[0].clientY+e.touches[1].clientY)/2};
         return;
     }
-    drag = true;
+    const g = toG(t.clientX, t.clientY);
+    // モードに関わらず、既存のオブジェクトを掴めるかチェック
+    let h = map.findLastIndex(d => Math.abs(g.x - (d.x+(d.isName?0:0.5))) < 1.2 && Math.abs(g.y - (d.y+(d.isName?0:0.5))) < 1.2);
+    if(h !== -1) { 
+        selIdx = h; isDraggingObject = true; drag = true;
+        sizeS.value = map[h].s;
+    } else if(mode === 'name' && activeName) {
+        // 新規配置し、そのままドラッグ状態へ
+        map.push({x:g.x, y:g.y, name:activeName, isName:true, s:parseFloat(sizeS.value)});
+        selIdx = map.length - 1; isDraggingObject = true; drag = true;
+    } else {
+        isDraggingObject = false; drag = true;
+    }
 }, {passive: false});
 
 cvs.addEventListener('touchmove', e => {
     e.preventDefault(); const t = e.touches[0];
-    if(Math.hypot(t.clientX - lastT.x, t.clientY - lastT.y) > 10) { hasMoved = true; isClickReady = false; }
     if(pinch && e.touches.length >= 2) {
         let d = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
         let m = {x:(e.touches[0].clientX+e.touches[1].clientX)/2, y:(e.touches[0].clientY+e.touches[1].clientY)/2};
         let f = d / lastDist; cam.x = m.x - (m.x - cam.x)*f + (m.x - lastMid.x); cam.y = m.y - (m.y - cam.y)*f + (m.y - lastMid.y);
         cam.z *= f; lastDist = d; lastMid = m; document.getElementById('zoom-tag').innerText = "Zoom: "+Math.round(cam.z*100)+"%";
     } else if(drag) {
-        if(mode === 'move' && activeAsset === -1) { cam.x += (t.clientX - lastT.x); cam.y += (t.clientY - lastT.y); }
-        else if(mode === 'pen') {
-            const g = toG(t.clientX, t.clientY); const prevG = toG(lastT.x, lastT.y);
-            addEdgeLine(Math.round(prevG.x), Math.round(prevG.y), Math.round(g.x), Math.round(g.y));
+        const g = toG(t.clientX, t.clientY); const pg = toG(lastT.x, lastT.y);
+        if(isDraggingObject && selIdx !== -1) {
+            // ジリジリ移動：前回の位置からの差分を足す
+            map[selIdx].x += (g.x - pg.x); map[selIdx].y += (g.y - pg.y);
+        } else if(mode === 'move' && activeAsset === -1) {
+            cam.x += (t.clientX - lastT.x); cam.y += (t.clientY - lastT.y);
+        } else if(mode === 'pen') {
+            addEdgeLine(Math.round(pg.x), Math.round(pg.y), Math.round(g.x), Math.round(g.y));
         }
     }
     lastT = {x: t.clientX, y: t.clientY}; render();
 }, {passive: false});
 
 cvs.addEventListener('touchend', e => {
-    if(!pinch && isClickReady && !hasMoved && (Date.now() - touchStartTime < 300)) {
-        const g = toG(lastT.x, lastT.y);
-        if(mode === 'move') {
-            if(activeAsset !== -1) { map.push({x:Math.floor(g.x), y:Math.floor(g.y), aIdx:activeAsset, s:parseFloat(sizeS.value)}); selIdx = map.length-1; }
-            else {
-                let h = map.findLastIndex(d => Math.abs(g.x - (d.x+(d.isName?0:0.5))) < 1 && Math.abs(g.y - (d.y+(d.isName?0:0.5))) < 1);
-                if(h !== -1) { selIdx = h; sizeS.value = map[h].s; } else { selIdx = -1; }
-            }
-        } else if(mode === 'name') {
-            if(activeName) {
-                map.push({x:g.x, y:g.y, name:activeName, isName:true, s:parseFloat(sizeS.value)});
-                selIdx = map.length - 1; pickNextName();
-            } else {
-                // 名前がない場合は選択モードとして動く
-                let h = map.findLastIndex(d => d.isName && Math.abs(g.x - d.x) < 1 && Math.abs(g.y - d.y) < 1);
-                if(h !== -1) { selIdx = h; sizeS.value = map[h].s; } else { selIdx = -1; }
-            }
-        } else if(mode === 'erase') {
-            let h = map.findLastIndex(d => Math.abs(g.x - (d.x+(d.isName?0:0.5))) < 1 && Math.abs(g.y - (d.y+(d.isName?0:0.5))) < 1);
-            if(h !== -1) map.splice(h, 1);
-        }
+    if(isDraggingObject && mode === 'name' && activeName) {
+        // 配置完了して次の名前へ
+        pickNextName();
     }
-    drag = pinch = false; save(); render();
+    isDraggingObject = false; drag = pinch = false; save(); render();
 });
 
 function addEdgeLine(x1, y1, x2, y2) {
@@ -173,13 +169,7 @@ window.deselect = () => { activeAsset = -1; selIdx = -1; document.querySelectorA
 function setMode(m) {
     mode = m; selIdx = -1; if(m!=='move') activeAsset = -1;
     ['m-move','m-pen','m-erase','m-name'].forEach(id => document.getElementById(id).className = id===`m-${m}`?'active':'');
-    if(m==='name') {
-        if(nameQueue.length === 0 && !activeName) {
-            document.getElementById('name-input-ui').style.display = 'block';
-        }
-    } else {
-        document.getElementById('name-input-ui').style.display = 'none';
-    }
+    document.getElementById('name-input-ui').style.display = (m==='name' && nameQueue.length===0 && !activeName)?'block':'none';
     render();
 }
 document.getElementById('m-move').onclick = () => setMode('move');
@@ -191,9 +181,8 @@ function importNames() {
     const txt = document.getElementById('name-area').value;
     if(!txt.trim()) return;
     nameQueue = txt.split(/[\n,、\t]+/).map(s => s.trim()).filter(s => s.length > 0);
-    document.getElementById('name-input-ui').style.display = 'none'; // 窓を閉じる
-    pickNextName();
-    render();
+    document.getElementById('name-input-ui').style.display = 'none';
+    pickNextName(); render();
 }
 function pickNextName() {
     activeName = nameQueue.length > 0 ? nameQueue.shift() : null;
@@ -232,7 +221,7 @@ function load() {
 }
 window.nudge = (dx,dy) => { if(selIdx!==-1){ map[selIdx].x+=dx; map[selIdx].y+=dy; render(); save(); } };
 window.adjS = (v) => { if(selIdx!==-1){ let n=parseFloat(sizeS.value)+v; n=Math.max(0.1,n); sizeS.value=n; map[selIdx].s=n; render(); save(); } };
-window.adjO = (v) => { let idx=(selIdx!==-1)?map[selIdx].aIdx:activeAsset; if(idx!==-1 && assets[idx]){ assets[idx].off+=v; offS.value=assets[idx].off; render(); save(); } };
+window.adjO = (v) => { let idx=(selIdx!==-1)?map[selIdx].aIdx:activeAsset; if(idx!==-1 && assets[idx]){ assets[idx].off+=v; render(); save(); } };
 window.clearAll = () => { if(confirm("消去しますか？")){ localStorage.clear(); location.reload(); } };
 init();
 </script>
