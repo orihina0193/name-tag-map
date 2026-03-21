@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.1 SelectionFix</title>
+    <title>避難所レイアウト v29.1.2 SelectionPriority</title>
     <style>
         :root { --panel-h: 240px; --panel-w: 220px; }
         body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; display: flex; flex-direction: column; }
@@ -153,22 +153,32 @@ function handleStart(x, y, isRight = false) {
     }
     else if(mode === 'p-erase') { lines = lines.filter(l => Math.hypot((l.x1+l.x2)/2-rawG.x,(l.y1+l.y2)/2-rawG.y)>0.4); save(); }
     else if(mode === 'move' || mode === 'erase') {
-        // ★修正: すでに選択中のものがあれば、まずその当たり判定を優先する
         let hitIdx = -1;
+        // ★最優先: 選択中のオブジェクト(selIdx)をまずチェック
         if (selIdx !== -1) {
             const d = map[selIdx]; const a = assets[d.aIdx];
-            if (rawG.x >= d.x && rawG.x < d.x+a.gw && rawG.y >= d.y && rawG.y < d.y+a.gh) hitIdx = selIdx;
+            if (rawG.x >= d.x && rawG.x < d.x+a.gw && rawG.y >= d.y && rawG.y < d.y+a.gh) {
+                hitIdx = selIdx;
+            }
         }
-        // 選択中のものに当たっていなければ、重なり順で検索
+        // 選択中のものに当たっていなければ、初めて全体から検索
         if (hitIdx === -1) {
-            hitIdx = map.findLastIndex(d => { const a = assets[d.aIdx]; return rawG.x >= d.x && rawG.x < d.x+a.gw && rawG.y >= d.y && rawG.y < d.y+a.gh; });
+            hitIdx = map.findLastIndex(d => {
+                const a = assets[d.aIdx];
+                return rawG.x >= d.x && rawG.x < d.x+a.gw && rawG.y >= d.y && rawG.y < d.y+a.gh;
+            });
         }
         
         if(mode === 'erase' && hitIdx !== -1) { map.splice(hitIdx, 1); selIdx = -1; save(); }
         else if(mode === 'move') { 
             if(hitIdx !== -1) {
-                if (selIdx === hitIdx) { selIdx = -1; lockedTarget = -1; } 
-                else { selIdx = hitIdx; lockedTarget = map[selIdx].id; activeAsset = -1; updateThumbSelection(); } 
+                // すでに選んでいるものを再度叩いたら解除（トグル）
+                if (selIdx === hitIdx) { 
+                    selIdx = -1; lockedTarget = -1; 
+                } else { 
+                    selIdx = hitIdx; lockedTarget = map[selIdx].id; 
+                    activeAsset = -1; updateThumbSelection(); 
+                } 
             } 
             else if(activeAsset !== -1) { 
                 const a = assets[activeAsset]; const nx = gx_o - (a.gw-1), ny = gy_o - (a.gh-1);
@@ -176,7 +186,9 @@ function handleStart(x, y, isRight = false) {
                     const newObj = {id: Date.now(), x: nx, y: ny, aIdx: activeAsset, s: a.defS, off: a.defO, ox: a.ox, oy: a.oy}; 
                     map.push(newObj); selIdx = map.length - 1; lockedTarget = newObj.id; save(); 
                 }
-            } else { selIdx = -1; lockedTarget = -1; drag = true; } 
+            } else { 
+                selIdx = -1; lockedTarget = -1; drag = true; 
+            } 
         }
     }
     render();
