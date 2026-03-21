@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.0.1 Fix</title>
+    <title>避難所レイアウト v29.0.2 PenFix</title>
     <style>
         :root { --panel-h: 240px; --panel-w: 220px; }
         body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; display: flex; flex-direction: column; }
@@ -125,6 +125,7 @@ function render() {
             ctx.strokeStyle = "#007aff"; ctx.lineWidth = 2/cam.z; 
             const gx = Math.round(d.x), gy = Math.round(d.y);
             const pS = toS(gx+a.gw, gy+a.gh), pW = toS(gx, gy+a.gh), pE = toS(gx+a.gw, gy), pN = toS(gx, gy); 
+            ctx.beginPath(); ctx.moveTo(pS.x,pS.y); ctx.lineTo(pW.x,pW.y); ctx.lineTo(pN.y,pN.y); // Fix typo pN.y to pN.x elsewhere
             ctx.beginPath(); ctx.moveTo(pS.x,pS.y); ctx.lineTo(pW.x,pW.y); ctx.lineTo(pN.x,pN.y); ctx.lineTo(pE.x,pE.y); ctx.closePath(); ctx.stroke(); 
         }
     });
@@ -133,8 +134,17 @@ function render() {
 
 function handleStart(x, y, isRight = false) {
     if(isRight) { deselect(); return; }
-    const rawG = toG(x, y); const gx = Math.floor(rawG.x), gy = Math.floor(rawG.y);
-    if(mode === 'pen') { if(!penStart) penStart = {x:gx, y:gy}; else { if(penStart.x!==gx || penStart.y!==gy) { lines.push({x1:penStart.x,y1:penStart.y,x2:gx,y2:gy}); save(); } penStart = null; } }
+    const rawG = toG(x, y); 
+    const gx_p = Math.round(rawG.x), gy_p = Math.round(rawG.y); // ペン用 (節点)
+    const gx_o = Math.floor(rawG.x), gy_o = Math.floor(rawG.y); // オブジェクト用 (タイル内)
+
+    if(mode === 'pen') { 
+        if(!penStart) penStart = {x:gx_p, y:gy_p}; 
+        else { 
+            if(penStart.x!==gx_p || penStart.y!==gy_p) { lines.push({x1:penStart.x,y1:penStart.y,x2:gx_p,y2:gy_p}); save(); } 
+            penStart = null; 
+        } 
+    }
     else if(mode === 'p-erase') { lines = lines.filter(l => Math.hypot((l.x1+l.x2)/2-rawG.x,(l.y1+l.y2)/2-rawG.y)>0.4); save(); }
     else if(mode === 'move' || mode === 'erase') {
         const hitIdx = map.findLastIndex(d => { const a = assets[d.aIdx]; return rawG.x >= d.x && rawG.x < d.x+a.gw && rawG.y >= d.y && rawG.y < d.y+a.gh; });
@@ -142,7 +152,7 @@ function handleStart(x, y, isRight = false) {
         else if(mode === 'move') { 
             if(hitIdx !== -1) { selIdx = hitIdx; lockedTarget = map[selIdx].id; } 
             else if(activeAsset !== -1) { 
-                const a = assets[activeAsset]; const nx = gx - (a.gw-1), ny = gy - (a.gh-1);
+                const a = assets[activeAsset]; const nx = gx_o - (a.gw-1), ny = gy_o - (a.gh-1);
                 if(!isBlocked(nx, ny, a.gw, a.gh)) {
                     const newObj = {id: Date.now(), x: nx, y: ny, aIdx: activeAsset, s: a.defS, off: a.defO}; 
                     map.push(newObj); selIdx = map.length - 1; lockedTarget = newObj.id; save(); 
