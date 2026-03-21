@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.0.3 RockFix</title>
+    <title>避難所レイアウト v29.0.4 NudgeFix</title>
     <style>
         :root { --panel-h: 240px; --panel-w: 220px; }
         body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; display: flex; flex-direction: column; }
@@ -49,7 +49,7 @@
     <div class="row"><label>サイズ</label><button class="prec-btn" onclick="adjS(-0.05)">-</button><input type="range" id="size-s" min="0.1" max="5" step="0.05"><button class="prec-btn" onclick="adjS(0.05)">+</button></div>
     <div class="row"><label>接地</label><button class="prec-btn" onclick="adjO(-1)">-</button><input type="range" id="off-s" min="-100" max="100" step="1"><button class="prec-btn" onclick="adjO(1)">+</button></div>
     <div class="tool-section">
-        <div id="nudge-grid"><span></span><button onclick="nudge(0,-1)">↑</button><span></span><button onclick="nudge(-1,0)">←</button><button onclick="nudge(0,1)">↓</button><button onclick="nudge(1,0)">→</button></div>
+        <div id="nudge-grid"><span></span><button onclick="nudge(0,-0.1)">↑</button><span></span><button onclick="nudge(-0.1,0)">←</button><button onclick="nudge(0,0.1)">↓</button><button onclick="nudge(0.1,0)">→</button></div>
         <div class="mode-box">
             <button class="save-btn" onclick="exportImage()">画像として保存</button>
             <div class="data-row"><button class="data-btn btn-out" onclick="exportData()">出力</button><button class="data-btn btn-in" onclick="importData()">読込</button><button class="data-btn btn-clr" onclick="clearAll()">リセット</button></div>
@@ -63,7 +63,6 @@
 <div id="export-overlay" onclick="this.style.display='none'"><img id="export-img" src=""><p style="color:white;text-align:center;font-size:12px;">長押しで保存</p></div>
 
 <script>
-// ★ROCK2の黄金比率（位置・サイズ）をデフォルトに設定
 const PRESETS = [
     { name: "HQ", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/HQ.png", s: 1.6, o: 1, gw: 2, gh: 2, ox: -0.1, oy: -0.2 },
     { name: "DOOM", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/DOOM.png", s: 1.6, o: -3, gw: 2, gh: 2, ox: -0.2, oy: 0 },
@@ -72,7 +71,7 @@ const PRESETS = [
     { name: "RSS", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/RSS.png", s: 1.6, o: -4, gw: 2, gh: 2, ox: -0.2, oy: -0.3 },
     { name: "ST", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/ST.png", s: 1.6, o: 0, gw: 2, gh: 2, ox: -0.2, oy: -0.2 },
     { name: "OP", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/OP.png", s: 0.8, o: 0, gw: 1, gh: 1, ox: -0.1, oy: -0.1 },
-    { name: "ROCK2", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/ROCK2.png", s: 0.75, o: -5, gw: 1, gh: 1, ox: 0.1, oy: 0.1 } // サイズ0.8→0.75、位置ox/oyを+0.1ずつ微調整
+    { name: "ROCK2", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/ROCK2.png", s: 0.75, o: -5, gw: 1, gh: 1, ox: 0.4, oy: 0.4 } // 5回分(0.5)から少し引いた位置で調整
 ];
 
 const cvs = document.getElementById('cvs'); const ctx = cvs.getContext('2d');
@@ -120,7 +119,7 @@ function render() {
     map.sort((a,b)=>(Math.round(a.x)+Math.round(a.y))-(Math.round(b.x)+Math.round(b.y))).forEach((d, i) => {
         const a = assets[d.aIdx]; if(!a) return;
         const w = T_W * d.s, h = (a.img.height/a.img.width) * w; 
-        const anchor = toS(d.x + a.gw + a.ox, d.y + a.gh + a.oy);
+        const anchor = toS(d.x + a.gw + d.ox, d.y + a.gh + d.oy); // ★d.ox/oyを参照
         ctx.drawImage(a.img, anchor.x - w / 2, anchor.y - h + d.off, w, h);
         if(selIdx === i) { 
             ctx.strokeStyle = "#007aff"; ctx.lineWidth = 2/cam.z; 
@@ -135,8 +134,8 @@ function render() {
 function handleStart(x, y, isRight = false) {
     if(isRight) { deselect(); return; }
     const rawG = toG(x, y); 
-    const gx_p = Math.round(rawG.x), gy_p = Math.round(rawG.y); // ペン用 (節点)
-    const gx_o = Math.floor(rawG.x), gy_o = Math.floor(rawG.y); // オブジェクト用 (タイル内)
+    const gx_p = Math.round(rawG.x), gy_p = Math.round(rawG.y);
+    const gx_o = Math.floor(rawG.x), gy_o = Math.floor(rawG.y);
 
     if(mode === 'pen') { 
         if(!penStart) penStart = {x:gx_p, y:gy_p}; 
@@ -154,7 +153,7 @@ function handleStart(x, y, isRight = false) {
             else if(activeAsset !== -1) { 
                 const a = assets[activeAsset]; const nx = gx_o - (a.gw-1), ny = gy_o - (a.gh-1);
                 if(!isBlocked(nx, ny, a.gw, a.gh)) {
-                    const newObj = {id: Date.now(), x: nx, y: ny, aIdx: activeAsset, s: a.defS, off: a.defO}; 
+                    const newObj = {id: Date.now(), x: nx, y: ny, aIdx: activeAsset, s: a.defS, off: a.defO, ox: a.ox, oy: a.oy}; // ★初期オフセット
                     map.push(newObj); selIdx = map.length - 1; lockedTarget = newObj.id; save(); 
                 }
             } else { drag = true; } 
@@ -199,11 +198,8 @@ function setupEvents() {
     cvs.addEventListener('touchend', () => { drag = pinch = false; lockedTarget = -1; render(); });
     window.addEventListener('keydown', e => {
         if(selIdx === -1) return;
-        const d = map[selIdx]; const a = assets[d.aIdx];
-        let nx = d.x, ny = d.y;
-        if(e.key === 'ArrowUp') ny--; if(e.key === 'ArrowDown') ny++;
-        if(e.key === 'ArrowLeft') nx--; if(e.key === 'ArrowRight') nx++;
-        if(!isBlocked(nx, ny, a.gw, a.gh, d.id)) { d.x = nx; d.y = ny; save(); render(); }
+        if(e.key === 'ArrowUp') nudge(0, -0.1); if(e.key === 'ArrowDown') nudge(0, 0.1);
+        if(e.key === 'ArrowLeft') nudge(-0.1, 0); if(e.key === 'ArrowRight') nudge(0.1, 0);
         if(e.key === 'Delete' || e.key === 'Backspace') { map.splice(selIdx, 1); selIdx = -1; save(); render(); }
     });
 }
@@ -226,7 +222,7 @@ window.clearAll = () => { if(confirm("リセットしますか？")){ map = []; 
 function setMode(m) { mode = m; document.querySelectorAll('.mode-row button').forEach(b => b.classList.remove('active')); document.getElementById(`m-${m}`).classList.add('active'); render(); }
 window.adjS = (v) => { if(selIdx!==-1){ map[selIdx].s = parseFloat((map[selIdx].s + v).toFixed(2)); save(); render(); } };
 window.adjO = (v) => { if(selIdx!==-1){ map[selIdx].off += v; save(); render(); } };
-window.nudge = (dx,dy) => { if(selIdx!==-1){ const d = map[selIdx]; const a = assets[d.aIdx]; if(!isBlocked(d.x+dx, d.y+dy, a.gw, a.gh, d.id)) { d.x+=dx; d.y+=dy; save(); render(); } } };
+window.nudge = (dx,dy) => { if(selIdx!==-1){ const d = map[selIdx]; d.ox = parseFloat((d.ox + dx).toFixed(2)); d.oy = parseFloat((d.oy + dy).toFixed(2)); save(); render(); } };
 function addThumb(idx) { const d = document.createElement('div'); d.className = 'thumb'; d.style.backgroundImage = `url(${assets[idx].src})`; d.onclick = () => { activeAsset = idx; setMode('move'); document.querySelectorAll('.thumb').forEach(t=>t.classList.remove('selected')); d.classList.add('selected'); render(); }; document.getElementById('item-list').appendChild(d); }
 function deselect() { activeAsset = -1; selIdx = -1; document.querySelectorAll('.thumb').forEach(t=>t.classList.remove('selected')); render(); }
 function save() { localStorage.setItem('map_v20', JSON.stringify({m:map, l:lines})); }
