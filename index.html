@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.0 SelectLogic</title>
+    <title>避難所レイアウト v29.1.1 SelectionFix</title>
     <style>
         :root { --panel-h: 240px; --panel-w: 220px; }
         body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; display: flex; flex-direction: column; }
@@ -153,14 +153,22 @@ function handleStart(x, y, isRight = false) {
     }
     else if(mode === 'p-erase') { lines = lines.filter(l => Math.hypot((l.x1+l.x2)/2-rawG.x,(l.y1+l.y2)/2-rawG.y)>0.4); save(); }
     else if(mode === 'move' || mode === 'erase') {
-        const hitIdx = map.findLastIndex(d => { const a = assets[d.aIdx]; return rawG.x >= d.x && rawG.x < d.x+a.gw && rawG.y >= d.y && rawG.y < d.y+a.gh; });
+        // ★修正: すでに選択中のものがあれば、まずその当たり判定を優先する
+        let hitIdx = -1;
+        if (selIdx !== -1) {
+            const d = map[selIdx]; const a = assets[d.aIdx];
+            if (rawG.x >= d.x && rawG.x < d.x+a.gw && rawG.y >= d.y && rawG.y < d.y+a.gh) hitIdx = selIdx;
+        }
+        // 選択中のものに当たっていなければ、重なり順で検索
+        if (hitIdx === -1) {
+            hitIdx = map.findLastIndex(d => { const a = assets[d.aIdx]; return rawG.x >= d.x && rawG.x < d.x+a.gw && rawG.y >= d.y && rawG.y < d.y+a.gh; });
+        }
         
         if(mode === 'erase' && hitIdx !== -1) { map.splice(hitIdx, 1); selIdx = -1; save(); }
         else if(mode === 'move') { 
-            // ★トグル選択ロジック
             if(hitIdx !== -1) {
-                if (selIdx === hitIdx) { selIdx = -1; lockedTarget = -1; } // 同じ物をタップしたら解除
-                else { selIdx = hitIdx; lockedTarget = map[selIdx].id; activeAsset = -1; updateThumbSelection(); } // 新しく選択
+                if (selIdx === hitIdx) { selIdx = -1; lockedTarget = -1; } 
+                else { selIdx = hitIdx; lockedTarget = map[selIdx].id; activeAsset = -1; updateThumbSelection(); } 
             } 
             else if(activeAsset !== -1) { 
                 const a = assets[activeAsset]; const nx = gx_o - (a.gw-1), ny = gy_o - (a.gh-1);
@@ -168,7 +176,7 @@ function handleStart(x, y, isRight = false) {
                     const newObj = {id: Date.now(), x: nx, y: ny, aIdx: activeAsset, s: a.defS, off: a.defO, ox: a.ox, oy: a.oy}; 
                     map.push(newObj); selIdx = map.length - 1; lockedTarget = newObj.id; save(); 
                 }
-            } else { selIdx = -1; drag = true; } // 空地タップで解除
+            } else { selIdx = -1; lockedTarget = -1; drag = true; } 
         }
     }
     render();
@@ -230,9 +238,9 @@ window.adjS = (v) => { if(selIdx!==-1){ map[selIdx].s = parseFloat((map[selIdx].
 window.adjO = (v) => { if(selIdx!==-1){ map[selIdx].off += v; save(); render(); } };
 window.nudge = (dx,dy) => { if(selIdx!==-1){ const d = map[selIdx]; d.ox = parseFloat((d.ox + dx).toFixed(2)); d.oy = parseFloat((d.oy + dy).toFixed(2)); save(); render(); } };
 function addThumb(idx) { const d = document.createElement('div'); d.className = 'thumb'; d.style.backgroundImage = `url(${assets[idx].src})`; d.onclick = () => { selectAsset(idx, d); }; document.getElementById('item-list').appendChild(d); }
-function selectAsset(idx, el) { activeAsset = idx; selIdx = -1; setMode('move'); updateThumbSelection(el); render(); }
+function selectAsset(idx, el) { activeAsset = idx; selIdx = -1; lockedTarget = -1; setMode('move'); updateThumbSelection(el); render(); }
 function updateThumbSelection(selectedEl) { document.querySelectorAll('.thumb').forEach(t => t.classList.remove('selected')); if(selectedEl) selectedEl.classList.add('selected'); }
-function deselect() { activeAsset = -1; selIdx = -1; penStart = null; updateThumbSelection(); render(); }
+function deselect() { activeAsset = -1; selIdx = -1; lockedTarget = -1; penStart = null; updateThumbSelection(); render(); }
 function save() { localStorage.setItem('map_v20', JSON.stringify({m:map, l:lines})); }
 function load() { const s = localStorage.getItem('map_v20'); if(s) { const d = JSON.parse(s); map = d.m || []; lines = d.l || []; } }
 function crop(img) { const c = document.createElement('canvas'); const t = c.getContext('2d'); c.width = img.width; c.height = img.height; t.drawImage(img,0,0); const d = t.getImageData(0,0,c.width,c.height).data; let x1=c.width, y1=c.height, x2=0, y2=0; for(let y=0; y<c.height; y++) for(let x=0; x<c.width; x++) if(d[(y*c.width+x)*4+3]>10){ x1=Math.min(x1,x); y1=Math.min(y1,y); x2=Math.max(x2,x); y2=Math.max(y2,y); } const w = x2-x1+1, h = y2-y1+1; const c2 = document.createElement('canvas'); c2.width = w; c2.height = h; c2.getContext('2d').drawImage(img,x1,y1,w,h,0,0,w,h); return c2.toDataURL(); }
