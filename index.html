@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.0.2 PenFix</title>
+    <title>避難所レイアウト v29.0.3 RockFix</title>
     <style>
         :root { --panel-h: 240px; --panel-w: 220px; }
         body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; display: flex; flex-direction: column; }
@@ -27,7 +27,7 @@
         .prec-btn { width: 34px; height: 32px; font-size: 16px; border: 1px solid #ccc; background: #fff; border-radius: 6px; cursor: pointer; }
         .tool-section { display: flex; justify-content: space-between; gap: 8px; margin-top: 2px; }
         #nudge-grid { display: grid; grid-template-columns: repeat(3, 38px); gap: 3px; }
-        #nudge-grid button { height: 38px; font-size: 18px; border: 1px solid #ccc; background: #fff; border-radius: 6px; cursor: pointer; }
+        #nudge-grid button { height: 38px; font-size: 18px; border: 1px solid #ccc; background: #fff; border-radius: 8px; cursor: pointer; }
         .mode-box { flex: 1; display: flex; flex-direction: column; gap: 4px; width: 100%; }
         .mode-row { display: flex; gap: 3px; flex-wrap: wrap; }
         .mode-row button { flex: 1; min-width: 48px; height: 32px; font-size: 10px; font-weight: bold; border-radius: 6px; border: 1px solid #ccc; background: #fff; cursor: pointer; }
@@ -63,6 +63,7 @@
 <div id="export-overlay" onclick="this.style.display='none'"><img id="export-img" src=""><p style="color:white;text-align:center;font-size:12px;">長押しで保存</p></div>
 
 <script>
+// ★ROCK2の黄金比率（位置・サイズ）をデフォルトに設定
 const PRESETS = [
     { name: "HQ", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/HQ.png", s: 1.6, o: 1, gw: 2, gh: 2, ox: -0.1, oy: -0.2 },
     { name: "DOOM", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/DOOM.png", s: 1.6, o: -3, gw: 2, gh: 2, ox: -0.2, oy: 0 },
@@ -71,7 +72,7 @@ const PRESETS = [
     { name: "RSS", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/RSS.png", s: 1.6, o: -4, gw: 2, gh: 2, ox: -0.2, oy: -0.3 },
     { name: "ST", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/ST.png", s: 1.6, o: 0, gw: 2, gh: 2, ox: -0.2, oy: -0.2 },
     { name: "OP", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/OP.png", s: 0.8, o: 0, gw: 1, gh: 1, ox: -0.1, oy: -0.1 },
-    { name: "ROCK2", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/ROCK2.png", s: 0.8, o: -5, gw: 1, gh: 1, ox: -0.1, oy: -0.1 } 
+    { name: "ROCK2", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/ROCK2.png", s: 0.75, o: -5, gw: 1, gh: 1, ox: 0.1, oy: 0.1 } // サイズ0.8→0.75、位置ox/oyを+0.1ずつ微調整
 ];
 
 const cvs = document.getElementById('cvs'); const ctx = cvs.getContext('2d');
@@ -125,7 +126,6 @@ function render() {
             ctx.strokeStyle = "#007aff"; ctx.lineWidth = 2/cam.z; 
             const gx = Math.round(d.x), gy = Math.round(d.y);
             const pS = toS(gx+a.gw, gy+a.gh), pW = toS(gx, gy+a.gh), pE = toS(gx+a.gw, gy), pN = toS(gx, gy); 
-            ctx.beginPath(); ctx.moveTo(pS.x,pS.y); ctx.lineTo(pW.x,pW.y); ctx.lineTo(pN.y,pN.y); // Fix typo pN.y to pN.x elsewhere
             ctx.beginPath(); ctx.moveTo(pS.x,pS.y); ctx.lineTo(pW.x,pW.y); ctx.lineTo(pN.x,pN.y); ctx.lineTo(pE.x,pE.y); ctx.closePath(); ctx.stroke(); 
         }
     });
