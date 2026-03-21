@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.2 LogicFix</title>
+    <title>避難所レイアウト v29.1.3 PrecisionMode</title>
     <style>
         :root { --panel-h: 240px; --panel-w: 220px; }
         body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; display: flex; flex-direction: column; }
@@ -14,37 +14,31 @@
         .thumb { width: 45px; height: 45px; border-radius: 6px; border: 2px solid #ccc; background-size: contain; background-repeat: no-repeat; background-position: center; background-color: #fff; flex-shrink: 0; cursor: pointer; }
         .thumb.selected { border-color: #007aff; border-width: 3px; }
         .deselect-btn { width: 45px; height: 45px; border-radius: 6px; border: 1px solid #ccc; background: #eee; color: #666; font-size: 9px; font-weight: bold; flex-shrink: 0; }
-        #upload-label { width: 45px; height: 45px; border: 2px dashed #bbb; border-radius: 6px; display: flex; justify-content: center; align-items: center; font-size: 20px; color: #999; flex-shrink: 0; background: #fff; cursor: pointer; }
         #bot-panel { background: rgba(255,255,255,0.98); border-top: 1px solid #ccc; padding: 8px 10px; box-sizing: border-box; z-index: 100; display: flex; flex-direction: column; gap: 4px; height: var(--panel-h); }
         @media (orientation: landscape) or (min-width: 900px) {
             body { flex-direction: row; }
             #bot-panel { width: var(--panel-w); height: 100%; border-top: none; border-left: 1px solid #ccc; }
-            .tool-section { flex-direction: column; align-items: center; }
         }
         .row { display: flex; align-items: center; gap: 6px; }
         .row label { font-size: 11px; font-weight: bold; width: 35px; }
-        input[type="range"] { flex: 1; height: 28px; cursor: pointer; }
-        .prec-btn { width: 34px; height: 32px; font-size: 16px; border: 1px solid #ccc; background: #fff; border-radius: 6px; cursor: pointer; }
+        input[type="range"] { flex: 1; height: 28px; }
+        .prec-btn { width: 34px; height: 32px; font-size: 16px; border: 1px solid #ccc; background: #fff; border-radius: 6px; }
         .tool-section { display: flex; justify-content: space-between; gap: 8px; margin-top: 2px; }
         #nudge-grid { display: grid; grid-template-columns: repeat(3, 38px); gap: 3px; }
-        #nudge-grid button { height: 38px; font-size: 18px; border: 1px solid #ccc; background: #fff; border-radius: 8px; cursor: pointer; }
-        .mode-box { flex: 1; display: flex; flex-direction: column; gap: 4px; width: 100%; }
+        #nudge-grid button { height: 38px; font-size: 18px; border: 1px solid #ccc; background: #fff; border-radius: 8px; }
+        .mode-box { flex: 1; display: flex; flex-direction: column; gap: 4px; }
         .mode-row { display: flex; gap: 3px; flex-wrap: wrap; }
-        .mode-row button { flex: 1; min-width: 48px; height: 32px; font-size: 10px; font-weight: bold; border-radius: 6px; border: 1px solid #ccc; background: #fff; cursor: pointer; }
+        .mode-row button { flex: 1; min-width: 48px; height: 32px; font-size: 10px; font-weight: bold; border-radius: 6px; border: 1px solid #ccc; background: #fff; }
         .mode-row button.active { background: #007aff; color: #fff; }
-        .data-row { display: flex; gap: 3px; }
-        .data-btn { flex: 1; height: 32px; font-size: 10px; font-weight: bold; border-radius: 6px; border: none; color: white; cursor: pointer; }
+        .data-btn { flex: 1; height: 32px; font-size: 10px; font-weight: bold; border-radius: 6px; border: none; color: white; }
         .btn-out { background: #5856d6; } .btn-in { background: #ff9500; } .btn-clr { background: #ff3b30; }
-        .save-btn { height: 34px; font-size: 13px; background: #34c759; border: none; border-radius: 6px; color: white; font-weight: bold; cursor: pointer; margin-bottom: 2px; }
+        .save-btn { height: 34px; font-size: 13px; background: #34c759; border: none; border-radius: 6px; color: white; font-weight: bold; margin-bottom: 2px; }
         #export-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; display: none; flex-direction: column; align-items: center; justify-content: center; }
         #export-img { max-width: 90%; max-height: 75%; border: 2px solid #fff; }
     </style>
 </head>
 <body>
-<div id="main-container">
-    <canvas id="cvs"></canvas>
-    <div id="top-panel"><div id="item-list"><button class="deselect-btn" onclick="deselect()">選択<br>解除</button><label id="upload-label">＋<input type="file" id="img-in" hidden accept="image/*" multiple onchange="handleFiles(this.files)"></label></div></div>
-</div>
+<div id="main-container"><canvas id="cvs"></canvas><div id="top-panel"><div id="item-list"><button class="deselect-btn" onclick="deselect()">選択<br>解除</button></div></div></div>
 <div id="bot-panel">
     <div class="row"><label>サイズ</label><button class="prec-btn" onclick="adjS(-0.05)">-</button><input type="range" id="size-s" min="0.1" max="5" step="0.05"><button class="prec-btn" onclick="adjS(0.05)">+</button></div>
     <div class="row"><label>接地</label><button class="prec-btn" onclick="adjO(-1)">-</button><input type="range" id="off-s" min="-100" max="100" step="1"><button class="prec-btn" onclick="adjO(1)">+</button></div>
@@ -52,7 +46,7 @@
         <div id="nudge-grid"><span></span><button onclick="nudge(0,-0.1)">↑</button><span></span><button onclick="nudge(-0.1,0)">←</button><button onclick="nudge(0,0.1)">↓</button><button onclick="nudge(0.1,0)">→</button></div>
         <div class="mode-box">
             <button class="save-btn" onclick="exportImage()">画像として保存</button>
-            <div class="data-row"><button class="data-btn btn-out" onclick="exportData()">出力</button><button class="data-btn btn-in" onclick="importData()">読込</button><button class="data-btn btn-clr" onclick="clearAll()">リセット</button></div>
+            <div style="display:flex; gap:3px;"><button class="data-btn btn-out" onclick="exportData()">出力</button><button class="data-btn btn-in" onclick="importData()">読込</button><button class="data-btn btn-clr" onclick="clearAll()">消去</button></div>
             <div class="mode-row">
                 <button id="m-move" onclick="setMode('move')">移動</button><button id="m-pen" onclick="setMode('pen')">ペン</button>
                 <button id="m-p-erase" onclick="setMode('p-erase')">線消</button><button id="m-erase" onclick="setMode('erase')">消去</button>
@@ -60,7 +54,7 @@
         </div>
     </div>
 </div>
-<div id="export-overlay" onclick="this.style.display='none'"><img id="export-img" src=""><p style="color:white;text-align:center;font-size:12px;">長押しで保存</p></div>
+<div id="export-overlay" onclick="this.style.display='none'"><img id="export-img" src=""></div>
 
 <script>
 const PRESETS = [
@@ -76,10 +70,8 @@ const PRESETS = [
 
 const cvs = document.getElementById('cvs'); const ctx = cvs.getContext('2d');
 const T_W = 64, T_H = 32;
-let cam = { x: 0, y: 0, z: 1 };
-let assets = [], map = [], lines = [], selIdx = -1, activeAsset = -1, mode = 'move';
-let drag = false, pinch = false, lockedTarget = -1, penStart = null;
-let lastT = {x: 0, y: 0}, lastDist = 0;
+let cam = { x: 0, y: 0, z: 1 }, assets = [], map = [], lines = [], selIdx = -1, activeAsset = -1, mode = 'move';
+let drag = false, pinch = false, lockedTarget = -1, penStart = null, lastT = {x: 0, y: 0}, lastDist = 0;
 
 function init() { 
     window.addEventListener('resize', resize); resize();
@@ -88,21 +80,11 @@ function init() {
     setupEvents();
 }
 function resize() { cvs.width = cvs.parentElement.clientWidth; cvs.height = cvs.parentElement.clientHeight; render(); }
-
 const toS = (gx, gy) => ({ x: (gx - gy) * (T_W/2), y: (gx + gy) * (T_H/2) });
 const toG = (sx, sy) => {
     let x = (sx - cam.x)/cam.z, y = (sy - cam.y)/cam.z;
     let gy = (y/(T_H/2) - x/(T_W/2))/2; return { x: x/(T_W/2) + gy, y: gy };
 };
-
-function isBlocked(gx, gy, gw, gh, ignoreId = null) {
-    for (let x = gx; x < gx + gw; x++) {
-        for (let y = gy; y < gy + gh; y++) {
-            if (map.some(d => d.id !== ignoreId && x >= Math.round(d.x) && x < Math.round(d.x) + assets[d.aIdx].gw && y >= Math.round(d.y) && y < Math.round(d.y) + assets[d.aIdx].gh)) return true;
-        }
-    }
-    return false;
-}
 
 function render() {
     ctx.clearRect(0,0,cvs.width,cvs.height);
@@ -116,110 +98,82 @@ function render() {
         ctx.beginPath(); ctx.strokeStyle = "rgba(255,0,0,0.6)"; ctx.lineWidth = 4/cam.z;
         const s = toS(l.x1, l.y1), e = toS(l.x2, l.y2); ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke();
     });
-    
     if(mode === 'pen' && penStart) {
         const p = toS(penStart.x, penStart.y);
-        ctx.fillStyle = "rgba(255, 0, 0, 0.8)";
-        ctx.beginPath(); ctx.arc(p.x, p.y, 6/cam.z, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = "rgba(255, 0, 0, 0.8)"; ctx.beginPath(); ctx.arc(p.x, p.y, 6/cam.z, 0, Math.PI*2); ctx.fill();
     }
-
-    map.sort((a,b)=>(Math.round(a.x)+Math.round(a.y))-(Math.round(b.x)+Math.round(b.y))).forEach((d, i) => {
+    map.sort((a,b)=>(a.x+a.y)-(b.x+b.y)).forEach((d, i) => {
         const a = assets[d.aIdx]; if(!a) return;
         const w = T_W * d.s, h = (a.img.height/a.img.width) * w; 
         const anchor = toS(d.x + a.gw + d.ox, d.y + a.gh + d.oy); 
         ctx.drawImage(a.img, anchor.x - w / 2, anchor.y - h + d.off, w, h);
         if(selIdx === i) { 
-            ctx.strokeStyle = "#007aff"; ctx.lineWidth = 2/cam.z; 
-            const gx = Math.round(d.x), gy = Math.round(d.y);
-            const pS = toS(gx+a.gw, gy+a.gh), pW = toS(gx, gy+a.gh), pE = toS(gx+a.gw, gy), pN = toS(gx, gy); 
+            ctx.strokeStyle = "#007aff"; ctx.lineWidth = 3/cam.z; 
+            const pS = toS(d.x+a.gw, d.y+a.gh), pW = toS(d.x, d.y+a.gh), pE = toS(d.x+a.gw, d.y), pN = toS(d.x, d.y); 
             ctx.beginPath(); ctx.moveTo(pS.x,pS.y); ctx.lineTo(pW.x,pW.y); ctx.lineTo(pN.x,pN.y); ctx.lineTo(pE.x,pE.y); ctx.closePath(); ctx.stroke(); 
         }
     });
     ctx.restore();
 }
 
-function handleStart(x, y, isRight = false) {
-    if(isRight) { deselect(); return; }
+function handleStart(x, y) {
     const rawG = toG(x, y); 
     const gx_o = Math.floor(rawG.x), gy_o = Math.floor(rawG.y);
     const gx_p = Math.round(rawG.x), gy_p = Math.round(rawG.y);
 
-    if(mode === 'pen') { 
-        if(!penStart) { penStart = {x:gx_p, y:gy_p}; } 
+    if(mode === 'pen') {
+        if(!penStart) { penStart = {x:gx_p, y:gy_p}; }
         else { 
-            if(penStart.x!==gx_p || penStart.y!==gy_p) { lines.push({x1:penStart.x,y1:penStart.y,x2:gx_p,y2:gy_p}); save(); } 
-            penStart = null; 
-        } 
-    }
-    else if(mode === 'p-erase') { lines = lines.filter(l => Math.hypot((l.x1+l.x2)/2-rawG.x,(l.y1+l.y2)/2-rawG.y)>0.4); save(); }
-    else if(mode === 'move' || mode === 'erase') {
-        let hitIdx = -1;
-        // 1. まず「今選んでいるもの」がタップされたかチェック（最優先）
-        if (selIdx !== -1) {
-            const d = map[selIdx]; const a = assets[d.aIdx];
-            if (rawG.x >= d.x && rawG.x < d.x+a.gw && rawG.y >= d.y && rawG.y < d.y+a.gh) hitIdx = selIdx;
+            if(penStart.x!==gx_p || penStart.y!==gy_p) { lines.push({x1:penStart.x,y1:penStart.y,x2:gx_p,y2:gy_p}); save(); }
+            penStart = null; // ★描画後、強制リセットして終点が始点になるのを防ぐ
         }
-        // 2. 選んでいない、または空振りの場合のみ全体から探す
-        if (hitIdx === -1) {
-            hitIdx = map.findLastIndex(d => { const a = assets[d.aIdx]; return rawG.x >= d.x && rawG.x < d.x+a.gw && rawG.y >= d.y && rawG.y < d.y+a.gh; });
-        }
-        
+    } else if(mode === 'p-erase') {
+        lines = lines.filter(l => Math.hypot((l.x1+l.x2)/2-rawG.x,(l.y1+l.y2)/2-rawG.y)>0.5); save();
+    } else if(mode === 'move' || mode === 'erase') {
+        // ★当たり判定を「足元のタイル」に限定（画像の上の方は無視）
+        const hitIdx = map.findLastIndex(d => {
+            const a = assets[d.aIdx];
+            return rawG.x >= d.x && rawG.x < d.x + a.gw && rawG.y >= d.y && rawG.y < d.y + a.gh;
+        });
+
         if(mode === 'erase' && hitIdx !== -1) { map.splice(hitIdx, 1); selIdx = -1; save(); }
-        else if(mode === 'move') { 
+        else if(mode === 'move') {
             if(hitIdx !== -1) {
-                if (selIdx === hitIdx) { 
-                    // 選択中のものを再タップ -> 解除
-                    selIdx = -1; lockedTarget = -1; 
-                } else { 
-                    // 新しいものを選択 -> アセットリストの選択を消す（ここ重要！）
-                    selIdx = hitIdx; lockedTarget = map[selIdx].id; activeAsset = -1; 
-                    document.querySelectorAll('.thumb').forEach(t => t.classList.remove('selected'));
-                } 
-            } 
-            else if(activeAsset !== -1) { 
-                // アセット配置モード
-                const a = assets[activeAsset]; const nx = gx_o - (a.gw-1), ny = gy_o - (a.gh-1);
-                if(!isBlocked(nx, ny, a.gw, a.gh)) {
-                    const newObj = {id: Date.now(), x: nx, y: ny, aIdx: activeAsset, s: a.defS, off: a.defO, ox: a.ox, oy: a.oy}; 
-                    map.push(newObj); selIdx = map.length - 1; lockedTarget = newObj.id; save(); 
-                }
-            } else { 
-                // 何もないところをタップ
-                selIdx = -1; lockedTarget = -1; drag = true; 
-            } 
+                if(selIdx === hitIdx) { selIdx = -1; lockedTarget = -1; } // トグル解除
+                else { selIdx = hitIdx; lockedTarget = map[selIdx].id; activeAsset = -1; document.querySelectorAll('.thumb').forEach(t => t.classList.remove('selected')); }
+            } else if(activeAsset !== -1) {
+                const a = assets[activeAsset];
+                const nx = gx_o - (a.gw-1), ny = gy_o - (a.gh-1);
+                const newObj = {id: Date.now(), x: nx, y: ny, aIdx: activeAsset, s: a.defS, off: a.defO, ox: a.ox, oy: a.oy}; 
+                map.push(newObj); selIdx = map.length - 1; lockedTarget = newObj.id; save();
+            } else { selIdx = -1; lockedTarget = -1; drag = true; }
         }
     }
     render();
 }
 
 function handleMove(x, y, dx, dy) {
-    const rawG = toG(x, y);
-    // lockedTargetがある間は、判定を他に譲らない
     if(lockedTarget !== -1) { 
-        const d = map.find(d => d.id === lockedTarget); 
-        if(d) { 
-            const a = assets[d.aIdx]; const nx = Math.floor(rawG.x) - (a.gw-1), ny = Math.floor(rawG.y) - (a.gh-1);
-            if(!isBlocked(nx, ny, a.gw, a.gh, d.id)) { d.x = nx; d.y = ny; save(); }
-        } 
+        const rawG = toG(x, y); const d = map.find(d => d.id === lockedTarget);
+        if(d) { const a = assets[d.aIdx]; d.x = Math.floor(rawG.x) - (a.gw-1); d.y = Math.floor(rawG.y) - (a.gh-1); save(); }
     } else if(drag) { cam.x += dx; cam.y += dy; }
     render();
 }
 
 function setupEvents() {
-    cvs.addEventListener('mousedown', e => { lastT = {x:e.clientX, y:e.clientY}; handleStart(e.clientX, e.clientY, e.button === 2); });
+    cvs.addEventListener('mousedown', e => { lastT = {x:e.clientX, y:e.clientY}; handleStart(e.clientX, e.clientY); });
     window.addEventListener('mousemove', e => { if(drag || lockedTarget!==-1) handleMove(e.clientX, e.clientY, e.clientX-lastT.x, e.clientY-lastT.y); lastT = {x:e.clientX, y:e.clientY}; });
     window.addEventListener('mouseup', () => { drag = false; lockedTarget = -1; });
-    cvs.addEventListener('wheel', e => { e.preventDefault(); const factor = e.deltaY > 0 ? 0.9 : 1.1; cam.z *= factor; render(); }, {passive:false});
-    cvs.addEventListener('contextmenu', e => e.preventDefault());
+    cvs.addEventListener('wheel', e => { e.preventDefault(); cam.z *= (e.deltaY > 0 ? 0.9 : 1.1); render(); }, {passive:false});
     cvs.addEventListener('touchstart', e => {
-        if(e.touches.length >= 2) { pinch = true; drag = false; lockedTarget = -1; lastDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); return; }
+        if(e.touches.length >= 2) { pinch = true; lastDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); return; }
         const t = e.touches[0]; lastT = {x: t.clientX, y: t.clientY}; handleStart(t.clientX, t.clientY);
     }, {passive: false});
     cvs.addEventListener('touchmove', e => {
         e.preventDefault();
         if(pinch && e.touches.length >= 2) {
-            const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-            cam.z *= (dist / lastDist); lastDist = dist;
+            const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+            cam.z *= (d / lastDist); lastDist = d;
         } else if(!pinch) {
             const t = e.touches[0]; handleMove(t.clientX, t.clientY, t.clientX-lastT.x, t.clientY-lastT.y);
             lastT = {x: t.clientX, y: t.clientY};
@@ -230,42 +184,37 @@ function setupEvents() {
 }
 async function loadPresets() {
     for (const p of PRESETS) {
-        await new Promise(resolve => {
+        await new Promise(res => {
             const img = new Image(); img.crossOrigin = "anonymous";
             img.onload = () => {
                 const src = crop(img); const i2 = new Image();
-                i2.onload = () => { assets.push({ img: i2, src, defS: p.s, defO: p.o, gw: p.gw, gh: p.gh, ox: p.ox, oy: p.oy }); addThumb(assets.length - 1); resolve(); };
+                i2.onload = () => { assets.push({ img: i2, src, defS: p.s, defO: p.o, gw: p.gw, gh: p.gh, ox: p.ox, oy: p.oy }); addThumb(assets.length - 1); res(); };
                 i2.src = src;
             };
-            img.onerror = () => resolve(); img.src = p.url;
+            img.src = p.url;
         });
     }
 }
-function exportData() { const data = JSON.stringify({m: map, l: lines}); prompt("【出力】コピーして保存", btoa(unescape(encodeURIComponent(data)))); }
-function importData() { const code = prompt("【読込】コードを貼付"); if(!code) return; try { const d = JSON.parse(decodeURIComponent(escape(atob(code)))); map = d.m || []; lines = d.l || []; save(); render(); } catch(e) { alert("エラー"); } }
-window.clearAll = () => { if(confirm("リセットしますか？")){ map = []; lines = []; save(); render(); } };
-function setMode(m) { mode = m; penStart = null; document.querySelectorAll('.mode-row button').forEach(b => b.classList.remove('active')); document.getElementById(`m-${m}`).classList.add('active'); render(); }
-window.adjS = (v) => { if(selIdx!==-1){ map[selIdx].s = parseFloat((map[selIdx].s + v).toFixed(2)); save(); render(); } };
-window.adjO = (v) => { if(selIdx!==-1){ map[selIdx].off += v; save(); render(); } };
-window.nudge = (dx,dy) => { if(selIdx!==-1){ const d = map[selIdx]; d.ox = parseFloat((d.ox + dx).toFixed(2)); d.oy = parseFloat((d.oy + dy).toFixed(2)); save(); render(); } };
-function addThumb(idx) { const d = document.createElement('div'); d.className = 'thumb'; d.style.backgroundImage = `url(${assets[idx].src})`; d.onclick = () => { selectAsset(idx, d); }; document.getElementById('item-list').appendChild(d); }
-
-// ★修正: アセットを選択した時はマップの選択(selIdx)を完全にリセットする
-function selectAsset(idx, el) { 
-    activeAsset = idx; 
-    selIdx = -1; 
-    lockedTarget = -1; 
-    setMode('move'); 
-    document.querySelectorAll('.thumb').forEach(t => t.classList.remove('selected'));
-    if(el) el.classList.add('selected');
-    render(); 
+function addThumb(idx) { 
+    const d = document.createElement('div'); d.className = 'thumb'; d.style.backgroundImage = `url(${assets[idx].src})`; 
+    d.onclick = () => { 
+        activeAsset = idx; selIdx = -1; lockedTarget = -1; setMode('move');
+        document.querySelectorAll('.thumb').forEach(t => t.classList.remove('selected')); d.classList.add('selected'); render();
+    }; 
+    document.getElementById('item-list').appendChild(d); 
 }
-
 function deselect() { activeAsset = -1; selIdx = -1; lockedTarget = -1; penStart = null; document.querySelectorAll('.thumb').forEach(t => t.classList.remove('selected')); render(); }
+function setMode(m) { mode = m; penStart = null; document.querySelectorAll('.mode-row button').forEach(b => b.classList.remove('active')); document.getElementById(`m-${m}`).classList.add('active'); render(); }
 function save() { localStorage.setItem('map_v20', JSON.stringify({m:map, l:lines})); }
 function load() { const s = localStorage.getItem('map_v20'); if(s) { const d = JSON.parse(s); map = d.m || []; lines = d.l || []; } }
+function adjS(v) { if(selIdx!==-1){ map[selIdx].s = parseFloat((map[selIdx].s+v).toFixed(2)); save(); render(); } }
+function adjO(v) { if(selIdx!==-1){ map[selIdx].off+=v; save(); render(); } }
+function nudge(dx,dy) { if(selIdx!==-1){ map[selIdx].ox=parseFloat((map[selIdx].ox+dx).toFixed(2)); map[selIdx].oy=parseFloat((map[selIdx].oy+dy).toFixed(2)); save(); render(); } }
+function clearAll() { if(confirm("リセット？")){ map=[]; lines=[]; save(); render(); } }
+function exportData() { prompt("出力", btoa(unescape(encodeURIComponent(JSON.stringify({m:map,l:lines}))))); }
+function importData() { const c = prompt("読込"); if(c) { const d = JSON.parse(decodeURIComponent(escape(atob(c)))); map=d.m; lines=d.l; save(); render(); } }
+function exportImage() { deselect(); render(); const img = document.getElementById('export-img'); img.src = cvs.toDataURL(); document.getElementById('export-overlay').style.display='flex'; }
 function crop(img) { const c = document.createElement('canvas'); const t = c.getContext('2d'); c.width = img.width; c.height = img.height; t.drawImage(img,0,0); const d = t.getImageData(0,0,c.width,c.height).data; let x1=c.width, y1=c.height, x2=0, y2=0; for(let y=0; y<c.height; y++) for(let x=0; x<c.width; x++) if(d[(y*c.width+x)*4+3]>10){ x1=Math.min(x1,x); y1=Math.min(y1,y); x2=Math.max(x2,x); y2=Math.max(y2,y); } const w = x2-x1+1, h = y2-y1+1; const c2 = document.createElement('canvas'); c2.width = w; c2.height = h; c2.getContext('2d').drawImage(img,x1,y1,w,h,0,0,w,h); return c2.toDataURL(); }
-function exportImage() { deselect(); render(); const dataUrl = cvs.toDataURL("image/png"); const img = document.getElementById('export-img'); img.src = dataUrl; document.getElementById('export-overlay').style.display = 'flex'; }
 init();
 </script>
 </body>
