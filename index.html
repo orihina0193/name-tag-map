@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.0.5 RockFinalFix</title>
+    <title>避難所レイアウト v29.0.6 RockPrecision</title>
     <style>
         :root { --panel-h: 240px; --panel-w: 220px; }
         body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; display: flex; flex-direction: column; }
@@ -63,6 +63,7 @@
 <div id="export-overlay" onclick="this.style.display='none'"><img id="export-img" src=""><p style="color:white;text-align:center;font-size:12px;">長押しで保存</p></div>
 
 <script>
+// ★岩の位置を「今の位置から-13回分」に固定
 const PRESETS = [
     { name: "HQ", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/HQ.png", s: 1.6, o: 1, gw: 2, gh: 2, ox: -0.1, oy: -0.2 },
     { name: "DOOM", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/DOOM.png", s: 1.6, o: -3, gw: 2, gh: 2, ox: -0.2, oy: 0 },
@@ -71,7 +72,7 @@ const PRESETS = [
     { name: "RSS", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/RSS.png", s: 1.6, o: -4, gw: 2, gh: 2, ox: -0.2, oy: -0.3 },
     { name: "ST", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/ST.png", s: 1.6, o: 0, gw: 2, gh: 2, ox: -0.2, oy: -0.2 },
     { name: "OP", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/OP.png", s: 0.8, o: 0, gw: 1, gh: 1, ox: -0.1, oy: -0.1 },
-    { name: "ROCK2", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/ROCK2.png", s: 0.75, o: -5, gw: 1, gh: 1, ox: -0.8, oy: -0.8 } // ★0.1×5回分
+    { name: "ROCK2", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/ROCK2.png", s: 0.75, o: -5, gw: 1, gh: 1, ox: -0.8, oy: -0.8 } // ★ここを大幅にマイナス調整
 ];
 
 const cvs = document.getElementById('cvs'); const ctx = cvs.getContext('2d');
@@ -134,8 +135,8 @@ function render() {
 function handleStart(x, y, isRight = false) {
     if(isRight) { deselect(); return; }
     const rawG = toG(x, y); 
-    const gx_p = Math.round(rawG.x), gy_p = Math.round(rawG.y);
     const gx_o = Math.floor(rawG.x), gy_o = Math.floor(rawG.y);
+    const gx_p = Math.round(rawG.x), gy_p = Math.round(rawG.y);
 
     if(mode === 'pen') { 
         if(!penStart) penStart = {x:gx_p, y:gy_p}; 
@@ -153,7 +154,6 @@ function handleStart(x, y, isRight = false) {
             else if(activeAsset !== -1) { 
                 const a = assets[activeAsset]; const nx = gx_o - (a.gw-1), ny = gy_o - (a.gh-1);
                 if(!isBlocked(nx, ny, a.gw, a.gh)) {
-                    // ★プリセットの ox, oy を正しく引き継ぐ
                     const newObj = {id: Date.now(), x: nx, y: ny, aIdx: activeAsset, s: a.defS, off: a.defO, ox: a.ox, oy: a.oy}; 
                     map.push(newObj); selIdx = map.length - 1; lockedTarget = newObj.id; save(); 
                 }
