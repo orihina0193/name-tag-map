@@ -3,31 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.0.0 Hybrid</title>
+    <title>避難所レイアウト v29.0.1 Fix</title>
     <style>
         :root { --panel-h: 240px; --panel-w: 220px; }
         body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; display: flex; flex-direction: column; }
-        
-        /* 基本は縦画面（ボタン下） */
         #main-container { flex: 1; position: relative; overflow: hidden; }
         canvas { display: block; background: #f0f0f0; width: 100%; height: 100%; }
-        
         #top-panel { position: absolute; top: 0; width: 100%; height: 70px; background: rgba(255,255,255,0.9); border-bottom: 1px solid #ccc; display: flex; align-items: center; padding: 0 10px; box-sizing: border-box; z-index: 100; overflow-x: auto; }
         #item-list { display: flex; gap: 8px; align-items: center; }
         .thumb { width: 45px; height: 45px; border-radius: 6px; border: 2px solid #ccc; background-size: contain; background-repeat: no-repeat; background-position: center; background-color: #fff; flex-shrink: 0; cursor: pointer; }
         .thumb.selected { border-color: #007aff; border-width: 3px; }
         .deselect-btn { width: 45px; height: 45px; border-radius: 6px; border: 1px solid #ccc; background: #eee; color: #666; font-size: 9px; font-weight: bold; flex-shrink: 0; }
         #upload-label { width: 45px; height: 45px; border: 2px dashed #bbb; border-radius: 6px; display: flex; justify-content: center; align-items: center; font-size: 20px; color: #999; flex-shrink: 0; background: #fff; cursor: pointer; }
-
         #bot-panel { background: rgba(255,255,255,0.98); border-top: 1px solid #ccc; padding: 8px 10px; box-sizing: border-box; z-index: 100; display: flex; flex-direction: column; gap: 4px; height: var(--panel-h); }
-        
-        /* 横画面 or PC（ボタン右） */
         @media (orientation: landscape) or (min-width: 900px) {
             body { flex-direction: row; }
             #bot-panel { width: var(--panel-w); height: 100%; border-top: none; border-left: 1px solid #ccc; }
             .tool-section { flex-direction: column; align-items: center; }
         }
-
         .row { display: flex; align-items: center; gap: 6px; }
         .row label { font-size: 11px; font-weight: bold; width: 35px; }
         input[type="range"] { flex: 1; height: 28px; cursor: pointer; }
@@ -102,6 +95,15 @@ const toG = (sx, sy) => {
     let gy = (y/(T_H/2) - x/(T_W/2))/2; return { x: x/(T_W/2) + gy, y: gy };
 };
 
+function isBlocked(gx, gy, gw, gh, ignoreId = null) {
+    for (let x = gx; x < gx + gw; x++) {
+        for (let y = gy; y < gy + gh; y++) {
+            if (map.some(d => d.id !== ignoreId && x >= Math.round(d.x) && x < Math.round(d.x) + assets[d.aIdx].gw && y >= Math.round(d.y) && y < Math.round(d.y) + assets[d.aIdx].gh)) return true;
+        }
+    }
+    return false;
+}
+
 function render() {
     ctx.clearRect(0,0,cvs.width,cvs.height);
     ctx.save(); ctx.translate(cam.x, cam.y); ctx.scale(cam.z, cam.z);
@@ -131,18 +133,20 @@ function render() {
 
 function handleStart(x, y, isRight = false) {
     if(isRight) { deselect(); return; }
-    const rawG = toG(x, y); const crossG = { x: Math.round(rawG.x), y: Math.round(rawG.y) };
-    if(mode === 'pen') { if(!penStart) penStart = crossG; else { if(penStart.x!==crossG.x || penStart.y!==crossG.y) { lines.push({x1:penStart.x,y1:penStart.y,x2:crossG.x,y2:crossG.y}); save(); } penStart = null; } }
+    const rawG = toG(x, y); const gx = Math.floor(rawG.x), gy = Math.floor(rawG.y);
+    if(mode === 'pen') { if(!penStart) penStart = {x:gx, y:gy}; else { if(penStart.x!==gx || penStart.y!==gy) { lines.push({x1:penStart.x,y1:penStart.y,x2:gx,y2:gy}); save(); } penStart = null; } }
     else if(mode === 'p-erase') { lines = lines.filter(l => Math.hypot((l.x1+l.x2)/2-rawG.x,(l.y1+l.y2)/2-rawG.y)>0.4); save(); }
     else if(mode === 'move' || mode === 'erase') {
-        const hitIdx = map.findLastIndex(d => { const a = assets[d.aIdx]; return crossG.x >= Math.round(d.x) && crossG.x < Math.round(d.x)+a.gw && crossG.y >= Math.round(d.y) && crossG.y < Math.round(d.y)+a.gh; });
+        const hitIdx = map.findLastIndex(d => { const a = assets[d.aIdx]; return rawG.x >= d.x && rawG.x < d.x+a.gw && rawG.y >= d.y && rawG.y < d.y+a.gh; });
         if(mode === 'erase' && hitIdx !== -1) { map.splice(hitIdx, 1); selIdx = -1; save(); }
         else if(mode === 'move') { 
             if(hitIdx !== -1) { selIdx = hitIdx; lockedTarget = map[selIdx].id; } 
             else if(activeAsset !== -1) { 
-                const a = assets[activeAsset]; const nx = Math.round(rawG.x - (a.gw-1)), ny = Math.round(rawG.y - (a.gh-1));
-                const newObj = {id: Date.now(), x: nx, y: ny, aIdx: activeAsset, s: a.defS, off: a.defO}; 
-                map.push(newObj); selIdx = map.length - 1; lockedTarget = newObj.id; save(); 
+                const a = assets[activeAsset]; const nx = gx - (a.gw-1), ny = gy - (a.gh-1);
+                if(!isBlocked(nx, ny, a.gw, a.gh)) {
+                    const newObj = {id: Date.now(), x: nx, y: ny, aIdx: activeAsset, s: a.defS, off: a.defO}; 
+                    map.push(newObj); selIdx = map.length - 1; lockedTarget = newObj.id; save(); 
+                }
             } else { drag = true; } 
         }
     }
@@ -153,20 +157,20 @@ function handleMove(x, y, dx, dy) {
     const rawG = toG(x, y);
     if(lockedTarget !== -1) { 
         const d = map.find(d => d.id === lockedTarget); 
-        if(d) { const a = assets[d.aIdx]; d.x = Math.round(rawG.x - (a.gw-1)); d.y = Math.round(rawG.y - (a.gh-1)); save(); } 
+        if(d) { 
+            const a = assets[d.aIdx]; const nx = Math.floor(rawG.x) - (a.gw-1), ny = Math.floor(rawG.y) - (a.gh-1);
+            if(!isBlocked(nx, ny, a.gw, a.gh, d.id)) { d.x = nx; d.y = ny; save(); }
+        } 
     } else if(drag) { cam.x += dx; cam.y += dy; }
     render();
 }
 
 function setupEvents() {
-    // マウス
     cvs.addEventListener('mousedown', e => { lastT = {x:e.clientX, y:e.clientY}; handleStart(e.clientX, e.clientY, e.button === 2); });
     window.addEventListener('mousemove', e => { if(drag || lockedTarget!==-1) handleMove(e.clientX, e.clientY, e.clientX-lastT.x, e.clientY-lastT.y); lastT = {x:e.clientX, y:e.clientY}; });
     window.addEventListener('mouseup', () => { drag = false; lockedTarget = -1; });
     cvs.addEventListener('wheel', e => { e.preventDefault(); const factor = e.deltaY > 0 ? 0.9 : 1.1; cam.z *= factor; render(); }, {passive:false});
     cvs.addEventListener('contextmenu', e => e.preventDefault());
-
-    // タッチ
     cvs.addEventListener('touchstart', e => {
         if(e.touches.length >= 2) { pinch = true; drag = false; lockedTarget = -1; lastDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); return; }
         const t = e.touches[0]; lastT = {x: t.clientX, y: t.clientY}; handleStart(t.clientX, t.clientY);
@@ -183,17 +187,16 @@ function setupEvents() {
         render();
     }, {passive: false});
     cvs.addEventListener('touchend', () => { drag = pinch = false; lockedTarget = -1; render(); });
-
-    // キーボード
     window.addEventListener('keydown', e => {
         if(selIdx === -1) return;
-        if(e.key === 'ArrowUp') nudge(0,-1); if(e.key === 'ArrowDown') nudge(0,1);
-        if(e.key === 'ArrowLeft') nudge(-1,0); if(e.key === 'ArrowRight') nudge(1,0);
+        const d = map[selIdx]; const a = assets[d.aIdx];
+        let nx = d.x, ny = d.y;
+        if(e.key === 'ArrowUp') ny--; if(e.key === 'ArrowDown') ny++;
+        if(e.key === 'ArrowLeft') nx--; if(e.key === 'ArrowRight') nx++;
+        if(!isBlocked(nx, ny, a.gw, a.gh, d.id)) { d.x = nx; d.y = ny; save(); render(); }
         if(e.key === 'Delete' || e.key === 'Backspace') { map.splice(selIdx, 1); selIdx = -1; save(); render(); }
     });
 }
-
-// 共通機能
 async function loadPresets() {
     for (const p of PRESETS) {
         await new Promise(resolve => {
@@ -207,13 +210,13 @@ async function loadPresets() {
         });
     }
 }
-function exportData() { const data = JSON.stringify({m: map, l: lines}); prompt("【出力】コードをコピー", btoa(unescape(encodeURIComponent(data)))); }
+function exportData() { const data = JSON.stringify({m: map, l: lines}); prompt("【出力】コピーして保存", btoa(unescape(encodeURIComponent(data)))); }
 function importData() { const code = prompt("【読込】コードを貼付"); if(!code) return; try { const d = JSON.parse(decodeURIComponent(escape(atob(code)))); map = d.m || []; lines = d.l || []; save(); render(); } catch(e) { alert("エラー"); } }
 window.clearAll = () => { if(confirm("リセットしますか？")){ map = []; lines = []; save(); render(); } };
 function setMode(m) { mode = m; document.querySelectorAll('.mode-row button').forEach(b => b.classList.remove('active')); document.getElementById(`m-${m}`).classList.add('active'); render(); }
 window.adjS = (v) => { if(selIdx!==-1){ map[selIdx].s = parseFloat((map[selIdx].s + v).toFixed(2)); save(); render(); } };
 window.adjO = (v) => { if(selIdx!==-1){ map[selIdx].off += v; save(); render(); } };
-window.nudge = (dx,dy) => { if(selIdx!==-1){ map[selIdx].x += dx; map[selIdx].y += dy; save(); render(); } };
+window.nudge = (dx,dy) => { if(selIdx!==-1){ const d = map[selIdx]; const a = assets[d.aIdx]; if(!isBlocked(d.x+dx, d.y+dy, a.gw, a.gh, d.id)) { d.x+=dx; d.y+=dy; save(); render(); } } };
 function addThumb(idx) { const d = document.createElement('div'); d.className = 'thumb'; d.style.backgroundImage = `url(${assets[idx].src})`; d.onclick = () => { activeAsset = idx; setMode('move'); document.querySelectorAll('.thumb').forEach(t=>t.classList.remove('selected')); d.classList.add('selected'); render(); }; document.getElementById('item-list').appendChild(d); }
 function deselect() { activeAsset = -1; selIdx = -1; document.querySelectorAll('.thumb').forEach(t=>t.classList.remove('selected')); render(); }
 function save() { localStorage.setItem('map_v20', JSON.stringify({m:map, l:lines})); }
