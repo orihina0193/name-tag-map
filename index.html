@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.0.7 RockCorrected</title>
+    <title>避難所レイアウト v29.0.9 PenGuide</title>
     <style>
         :root { --panel-h: 240px; --panel-w: 220px; }
         body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; display: flex; flex-direction: column; }
@@ -71,7 +71,7 @@ const PRESETS = [
     { name: "RSS", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/RSS.png", s: 1.6, o: -4, gw: 2, gh: 2, ox: -0.2, oy: -0.3 },
     { name: "ST", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/ST.png", s: 1.6, o: 0, gw: 2, gh: 2, ox: -0.2, oy: -0.2 },
     { name: "OP", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/OP.png", s: 0.8, o: 0, gw: 1, gh: 1, ox: -0.1, oy: -0.1 },
-    { name: "ROCK2", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/ROCK2.png", s: 0.75, o: -5, gw: 1, gh: 1, ox: 0, oy: 0 } // ★手前側に修正
+    { name: "ROCK2", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/ROCK2.png", s: 0.75, o: -5, gw: 1, gh: 1, ox: 0, oy: 0 }
 ];
 
 const cvs = document.getElementById('cvs'); const ctx = cvs.getContext('2d');
@@ -116,6 +116,14 @@ function render() {
         ctx.beginPath(); ctx.strokeStyle = "rgba(255,0,0,0.6)"; ctx.lineWidth = 4/cam.z;
         const s = toS(l.x1, l.y1), e = toS(l.x2, l.y2); ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke();
     });
+    
+    // ★ペンモードの始点ガイド
+    if(mode === 'pen' && penStart) {
+        const p = toS(penStart.x, penStart.y);
+        ctx.fillStyle = "rgba(255, 0, 0, 0.8)";
+        ctx.beginPath(); ctx.arc(p.x, p.y, 6/cam.z, 0, Math.PI*2); ctx.fill();
+    }
+
     map.sort((a,b)=>(Math.round(a.x)+Math.round(a.y))-(Math.round(b.x)+Math.round(b.y))).forEach((d, i) => {
         const a = assets[d.aIdx]; if(!a) return;
         const w = T_W * d.s, h = (a.img.height/a.img.width) * w; 
@@ -138,7 +146,7 @@ function handleStart(x, y, isRight = false) {
     const gx_p = Math.round(rawG.x), gy_p = Math.round(rawG.y);
 
     if(mode === 'pen') { 
-        if(!penStart) penStart = {x:gx_p, y:gy_p}; 
+        if(!penStart) { penStart = {x:gx_p, y:gy_p}; } 
         else { 
             if(penStart.x!==gx_p || penStart.y!==gy_p) { lines.push({x1:penStart.x,y1:penStart.y,x2:gx_p,y2:gy_p}); save(); } 
             penStart = null; 
@@ -219,12 +227,12 @@ async function loadPresets() {
 function exportData() { const data = JSON.stringify({m: map, l: lines}); prompt("【出力】コピーして保存", btoa(unescape(encodeURIComponent(data)))); }
 function importData() { const code = prompt("【読込】コードを貼付"); if(!code) return; try { const d = JSON.parse(decodeURIComponent(escape(atob(code)))); map = d.m || []; lines = d.l || []; save(); render(); } catch(e) { alert("エラー"); } }
 window.clearAll = () => { if(confirm("リセットしますか？")){ map = []; lines = []; save(); render(); } };
-function setMode(m) { mode = m; document.querySelectorAll('.mode-row button').forEach(b => b.classList.remove('active')); document.getElementById(`m-${m}`).classList.add('active'); render(); }
+function setMode(m) { mode = m; penStart = null; document.querySelectorAll('.mode-row button').forEach(b => b.classList.remove('active')); document.getElementById(`m-${m}`).classList.add('active'); render(); }
 window.adjS = (v) => { if(selIdx!==-1){ map[selIdx].s = parseFloat((map[selIdx].s + v).toFixed(2)); save(); render(); } };
 window.adjO = (v) => { if(selIdx!==-1){ map[selIdx].off += v; save(); render(); } };
 window.nudge = (dx,dy) => { if(selIdx!==-1){ const d = map[selIdx]; d.ox = parseFloat((d.ox + dx).toFixed(2)); d.oy = parseFloat((d.oy + dy).toFixed(2)); save(); render(); } };
 function addThumb(idx) { const d = document.createElement('div'); d.className = 'thumb'; d.style.backgroundImage = `url(${assets[idx].src})`; d.onclick = () => { activeAsset = idx; setMode('move'); document.querySelectorAll('.thumb').forEach(t=>t.classList.remove('selected')); d.classList.add('selected'); render(); }; document.getElementById('item-list').appendChild(d); }
-function deselect() { activeAsset = -1; selIdx = -1; document.querySelectorAll('.thumb').forEach(t=>t.classList.remove('selected')); render(); }
+function deselect() { activeAsset = -1; selIdx = -1; penStart = null; document.querySelectorAll('.thumb').forEach(t=>t.classList.remove('selected')); render(); }
 function save() { localStorage.setItem('map_v20', JSON.stringify({m:map, l:lines})); }
 function load() { const s = localStorage.getItem('map_v20'); if(s) { const d = JSON.parse(s); map = d.m || []; lines = d.l || []; } }
 function crop(img) { const c = document.createElement('canvas'); const t = c.getContext('2d'); c.width = img.width; c.height = img.height; t.drawImage(img,0,0); const d = t.getImageData(0,0,c.width,c.height).data; let x1=c.width, y1=c.height, x2=0, y2=0; for(let y=0; y<c.height; y++) for(let x=0; x<c.width; x++) if(d[(y*c.width+x)*4+3]>10){ x1=Math.min(x1,x); y1=Math.min(y1,y); x2=Math.max(x2,x); y2=Math.max(y2,y); } const w = x2-x1+1, h = y2-y1+1; const c2 = document.createElement('canvas'); c2.width = w; c2.height = h; c2.getContext('2d').drawImage(img,x1,y1,w,h,0,0,w,h); return c2.toDataURL(); }
