@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.5 PrecisionFix</title>
+    <title>避難所レイアウト v29.1.6 LivePen</title>
     <style>
         :root { --panel-h: 240px; --panel-w: 220px; }
         body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; display: flex; flex-direction: column; }
@@ -69,7 +69,7 @@ const PRESETS = [
 const cvs = document.getElementById('cvs'); const ctx = cvs.getContext('2d');
 const T_W = 64, T_H = 32;
 let cam = { x: 0, y: 0, z: 1 }, assets = [], map = [], lines = [], selIdx = -1, activeAsset = -1, mode = 'move';
-let drag = false, pinch = false, lockedId = null, penStart = null, lastT = {x: 0, y: 0}, lastDist = 0;
+let drag = false, pinch = false, lockedId = null, penStart = null, penCurrent = null, lastT = {x: 0, y: 0}, lastDist = 0;
 
 function init() { 
     window.addEventListener('resize', resize); resize();
@@ -105,9 +105,11 @@ function render() {
         ctx.beginPath(); ctx.strokeStyle = "rgba(255,0,0,0.6)"; ctx.lineWidth = 4/cam.z;
         const s = toS(l.x1, l.y1), e = toS(l.x2, l.y2); ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke();
     });
-    if(mode === 'pen' && penStart) {
-        const p = toS(penStart.x, penStart.y);
-        ctx.fillStyle = "rgba(255, 0, 0, 0.8)"; ctx.beginPath(); ctx.arc(p.x, p.y, 6/cam.z, 0, Math.PI*2); ctx.fill();
+    if(mode === 'pen' && penStart && penCurrent) {
+        ctx.beginPath(); ctx.strokeStyle = "rgba(255, 0, 0, 0.4)"; ctx.setLineDash([5/cam.z, 5/cam.z]); ctx.lineWidth = 3/cam.z;
+        const s = toS(penStart.x, penStart.y), e = toS(penCurrent.x, penCurrent.y);
+        ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = "rgba(255, 0, 0, 0.8)"; ctx.beginPath(); ctx.arc(s.x, s.y, 5/cam.z, 0, Math.PI*2); ctx.fill();
     }
     map.sort((a,b)=>(Math.round(a.x)+Math.round(a.y))-(Math.round(b.x)+Math.round(b.y))).forEach((d, i) => {
         const a = assets[d.aIdx]; if(!a) return;
@@ -115,10 +117,13 @@ function render() {
         const anchor = toS(d.x + a.gw + d.ox, d.y + a.gh + d.oy); 
         ctx.drawImage(a.img, anchor.x - w / 2, anchor.y - h + d.off, w, h);
         if(selIdx === i) { 
-            ctx.strokeStyle = "#007aff"; ctx.lineWidth = (lockedId ? 1 : 3)/cam.z; 
-            const gx = Math.round(d.x), gy = Math.round(d.y);
-            const pS = toS(gx+a.gw, gy+a.gh), pW = toS(gx, gy+a.gh), pE = toS(gx+a.gw, gy), pN = toS(gx, gy); 
-            ctx.beginPath(); ctx.moveTo(pS.x,pS.y); ctx.lineTo(pW.x,pW.y); ctx.lineTo(pN.x,pN.y); ctx.lineTo(pE.x,pE.y); ctx.closePath(); ctx.stroke(); 
+            // ★操作中の子以外の青枠は表示しない（浮気防止）
+            if(!lockedId || lockedId === d.id) {
+                ctx.strokeStyle = "#007aff"; ctx.lineWidth = (lockedId ? 1 : 3)/cam.z; 
+                const gx = Math.round(d.x), gy = Math.round(d.y);
+                const pS = toS(gx+a.gw, gy+a.gh), pW = toS(gx, gy+a.gh), pE = toS(gx+a.gw, gy), pN = toS(gx, gy); 
+                ctx.beginPath(); ctx.moveTo(pS.x,pS.y); ctx.lineTo(pW.x,pW.y); ctx.lineTo(pN.x,pN.y); ctx.lineTo(pE.x,pE.y); ctx.closePath(); ctx.stroke(); 
+            }
         }
     });
     ctx.restore();
@@ -128,14 +133,9 @@ function handleStart(x, y) {
     const rawG = toG(x, y); 
     const gx_o = Math.floor(rawG.x), gy_o = Math.floor(rawG.y), gx_p = Math.round(rawG.x), gy_p = Math.round(rawG.y);
 
-    if(mode === 'pen') {
-        if(!penStart) { penStart = {x:gx_p, y:gy_p}; }
-        else { if(penStart.x!==gx_p || penStart.y!==gy_p) { lines.push({x1:penStart.x,y1:penStart.y,x2:gx_p,y2:gy_p}); save(); } penStart = null; }
-        render(); return;
-    }
+    if(mode === 'pen') { penStart = {x:gx_p, y:gy_p}; penCurrent = {x:gx_p, y:gy_p}; render(); return; }
     if(mode === 'p-erase') { lines = lines.filter(l => Math.hypot((l.x1+l.x2)/2-rawG.x,(l.y1+l.y2)/2-rawG.y)>0.5); save(); render(); return; }
 
-    // 移動・配置・消去
     let hitIdx = map.findLastIndex(d => {
         const a = assets[d.aIdx];
         return rawG.x >= d.x && rawG.x < d.x + a.gw && rawG.y >= d.y && rawG.y < d.y + a.gh;
@@ -159,14 +159,27 @@ function handleStart(x, y) {
 }
 
 function handleMove(x, y, dx, dy) {
+    const rawG = toG(x, y);
+    if(mode === 'pen' && penStart) { penCurrent = {x: Math.round(rawG.x), y: Math.round(rawG.y)}; render(); return; }
+    
     if(lockedId) { 
-        const rawG = toG(x, y); const d = map.find(d => d.id === lockedId);
+        const d = map.find(d => d.id === lockedId);
         if(d) { 
             const a = assets[d.aIdx]; const nx = Math.floor(rawG.x) - (a.gw-1), ny = Math.floor(rawG.y) - (a.gh-1);
             if(!isBlocked(nx, ny, a.gw, a.gh, d.id)) { d.x = nx; d.y = ny; save(); }
         }
     } else if(drag) { cam.x += dx; cam.y += dy; }
     render();
+}
+
+function handleEnd() {
+    if(mode === 'pen' && penStart && penCurrent) {
+        if(penStart.x !== penCurrent.x || penStart.y !== penCurrent.y) {
+            lines.push({x1:penStart.x, y1:penStart.y, x2:penCurrent.x, y2:penCurrent.y});
+            save();
+        }
+    }
+    drag = pinch = false; lockedId = null; penStart = null; penCurrent = null; render();
 }
 
 function setupEvents() {
@@ -183,13 +196,11 @@ function setupEvents() {
             const t = e.touches[0]; handleMove(t.clientX, t.clientY, t.clientX-lastT.x, t.clientY-lastT.y);
             lastT = {x: t.clientX, y: t.clientY};
         }
-        render();
     }, {passive: false});
-    cvs.addEventListener('touchend', () => { drag = pinch = false; lockedId = null; render(); });
-    // PC対応
+    cvs.addEventListener('touchend', handleEnd);
     cvs.addEventListener('mousedown', e => { lastT = {x:e.clientX, y:e.clientY}; handleStart(e.clientX, e.clientY); });
-    window.addEventListener('mousemove', e => { if(drag || lockedId) handleMove(e.clientX, e.clientY, e.clientX-lastT.x, e.clientY-lastT.y); lastT = {x:e.clientX, y:e.clientY}; });
-    window.addEventListener('mouseup', () => { drag = false; lockedId = null; render(); });
+    window.addEventListener('mousemove', e => { if(drag || lockedId || penStart) handleMove(e.clientX, e.clientY, e.clientX-lastT.x, e.clientY-lastT.y); lastT = {x:e.clientX, y:e.clientY}; });
+    window.addEventListener('mouseup', handleEnd);
 }
 
 async function loadPresets() {
