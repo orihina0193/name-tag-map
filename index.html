@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.0.9 PenGuide</title>
+    <title>避難所レイアウト v29.1.0 SelectLogic</title>
     <style>
         :root { --panel-h: 240px; --panel-w: 220px; }
         body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; display: flex; flex-direction: column; }
@@ -117,7 +117,6 @@ function render() {
         const s = toS(l.x1, l.y1), e = toS(l.x2, l.y2); ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke();
     });
     
-    // ★ペンモードの始点ガイド
     if(mode === 'pen' && penStart) {
         const p = toS(penStart.x, penStart.y);
         ctx.fillStyle = "rgba(255, 0, 0, 0.8)";
@@ -155,16 +154,21 @@ function handleStart(x, y, isRight = false) {
     else if(mode === 'p-erase') { lines = lines.filter(l => Math.hypot((l.x1+l.x2)/2-rawG.x,(l.y1+l.y2)/2-rawG.y)>0.4); save(); }
     else if(mode === 'move' || mode === 'erase') {
         const hitIdx = map.findLastIndex(d => { const a = assets[d.aIdx]; return rawG.x >= d.x && rawG.x < d.x+a.gw && rawG.y >= d.y && rawG.y < d.y+a.gh; });
+        
         if(mode === 'erase' && hitIdx !== -1) { map.splice(hitIdx, 1); selIdx = -1; save(); }
         else if(mode === 'move') { 
-            if(hitIdx !== -1) { selIdx = hitIdx; lockedTarget = map[selIdx].id; } 
+            // ★トグル選択ロジック
+            if(hitIdx !== -1) {
+                if (selIdx === hitIdx) { selIdx = -1; lockedTarget = -1; } // 同じ物をタップしたら解除
+                else { selIdx = hitIdx; lockedTarget = map[selIdx].id; activeAsset = -1; updateThumbSelection(); } // 新しく選択
+            } 
             else if(activeAsset !== -1) { 
                 const a = assets[activeAsset]; const nx = gx_o - (a.gw-1), ny = gy_o - (a.gh-1);
                 if(!isBlocked(nx, ny, a.gw, a.gh)) {
                     const newObj = {id: Date.now(), x: nx, y: ny, aIdx: activeAsset, s: a.defS, off: a.defO, ox: a.ox, oy: a.oy}; 
                     map.push(newObj); selIdx = map.length - 1; lockedTarget = newObj.id; save(); 
                 }
-            } else { drag = true; } 
+            } else { selIdx = -1; drag = true; } // 空地タップで解除
         }
     }
     render();
@@ -204,12 +208,6 @@ function setupEvents() {
         render();
     }, {passive: false});
     cvs.addEventListener('touchend', () => { drag = pinch = false; lockedTarget = -1; render(); });
-    window.addEventListener('keydown', e => {
-        if(selIdx === -1) return;
-        if(e.key === 'ArrowUp') nudge(0, -0.1); if(e.key === 'ArrowDown') nudge(0, 0.1);
-        if(e.key === 'ArrowLeft') nudge(-0.1, 0); if(e.key === 'ArrowRight') nudge(0.1, 0);
-        if(e.key === 'Delete' || e.key === 'Backspace') { map.splice(selIdx, 1); selIdx = -1; save(); render(); }
-    });
 }
 async function loadPresets() {
     for (const p of PRESETS) {
@@ -231,8 +229,10 @@ function setMode(m) { mode = m; penStart = null; document.querySelectorAll('.mod
 window.adjS = (v) => { if(selIdx!==-1){ map[selIdx].s = parseFloat((map[selIdx].s + v).toFixed(2)); save(); render(); } };
 window.adjO = (v) => { if(selIdx!==-1){ map[selIdx].off += v; save(); render(); } };
 window.nudge = (dx,dy) => { if(selIdx!==-1){ const d = map[selIdx]; d.ox = parseFloat((d.ox + dx).toFixed(2)); d.oy = parseFloat((d.oy + dy).toFixed(2)); save(); render(); } };
-function addThumb(idx) { const d = document.createElement('div'); d.className = 'thumb'; d.style.backgroundImage = `url(${assets[idx].src})`; d.onclick = () => { activeAsset = idx; setMode('move'); document.querySelectorAll('.thumb').forEach(t=>t.classList.remove('selected')); d.classList.add('selected'); render(); }; document.getElementById('item-list').appendChild(d); }
-function deselect() { activeAsset = -1; selIdx = -1; penStart = null; document.querySelectorAll('.thumb').forEach(t=>t.classList.remove('selected')); render(); }
+function addThumb(idx) { const d = document.createElement('div'); d.className = 'thumb'; d.style.backgroundImage = `url(${assets[idx].src})`; d.onclick = () => { selectAsset(idx, d); }; document.getElementById('item-list').appendChild(d); }
+function selectAsset(idx, el) { activeAsset = idx; selIdx = -1; setMode('move'); updateThumbSelection(el); render(); }
+function updateThumbSelection(selectedEl) { document.querySelectorAll('.thumb').forEach(t => t.classList.remove('selected')); if(selectedEl) selectedEl.classList.add('selected'); }
+function deselect() { activeAsset = -1; selIdx = -1; penStart = null; updateThumbSelection(); render(); }
 function save() { localStorage.setItem('map_v20', JSON.stringify({m:map, l:lines})); }
 function load() { const s = localStorage.getItem('map_v20'); if(s) { const d = JSON.parse(s); map = d.m || []; lines = d.l || []; } }
 function crop(img) { const c = document.createElement('canvas'); const t = c.getContext('2d'); c.width = img.width; c.height = img.height; t.drawImage(img,0,0); const d = t.getImageData(0,0,c.width,c.height).data; let x1=c.width, y1=c.height, x2=0, y2=0; for(let y=0; y<c.height; y++) for(let x=0; x<c.width; x++) if(d[(y*c.width+x)*4+3]>10){ x1=Math.min(x1,x); y1=Math.min(y1,y); x2=Math.max(x2,x); y2=Math.max(y2,y); } const w = x2-x1+1, h = y2-y1+1; const c2 = document.createElement('canvas'); c2.width = w; c2.height = h; c2.getContext('2d').drawImage(img,x1,y1,w,h,0,0,w,h); return c2.toDataURL(); }
