@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.7 UI-Fix</title>
+    <title>避難所レイアウト v29.1.8 FixedControls</title>
     <style>
-        :root { --panel-h: 240px; --panel-w: 160px; }
+        :root { --panel-h: 240px; --panel-w: 180px; }
         body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; display: flex; flex-direction: column; }
         #main-container { flex: 1; position: relative; overflow: hidden; }
         canvas { display: block; background: #f0f0f0; width: 100%; height: 100%; }
@@ -16,26 +16,23 @@
         .deselect-btn { width: 45px; height: 45px; border-radius: 6px; border: 1px solid #ccc; background: #eee; color: #666; font-size: 9px; font-weight: bold; flex-shrink: 0; }
         #upload-label { width: 45px; height: 45px; border: 2px dashed #bbb; border-radius: 6px; display: flex; justify-content: center; align-items: center; font-size: 20px; color: #999; flex-shrink: 0; background: #fff; }
         
-        /* 操作パネルの基本（縦向き） */
         #bot-panel { background: rgba(255,255,255,0.98); border-top: 1px solid #ccc; padding: 8px 10px; box-sizing: border-box; z-index: 100; display: flex; flex-direction: column; gap: 4px; height: var(--panel-h); overflow-y: auto; }
         
-        /* 横向き時のスタイル */
         @media (orientation: landscape) {
             body { flex-direction: row; }
-            #bot-panel { width: var(--panel-w); height: 100%; border-top: none; border-left: 1px solid #ccc; padding: 5px; }
-            .tool-section { flex-direction: column; }
+            #bot-panel { width: var(--panel-w); height: 100%; border-top: none; border-left: 1px solid #ccc; padding: 8px; }
+            .tool-section { flex-direction: column; gap: 10px; }
             #nudge-grid { grid-template-columns: repeat(3, 1fr) !important; width: 100%; }
-            #nudge-grid button { height: 32px !important; font-size: 14px !important; }
-            .prec-btn { width: 28px !important; height: 28px !important; }
-            .row label { width: 30px !important; font-size: 10px !important; }
-            .save-btn { font-size: 11px !important; height: 30px !important; }
-            .data-btn { height: 28px !important; font-size: 9px !important; }
+            #nudge-grid button { height: 34px !important; }
+            .prec-btn { width: 30px !important; height: 30px !important; font-size: 14px !important; }
+            .row label { width: 32px !important; font-size: 10px !important; }
+            .save-btn { font-size: 12px !important; height: 32px !important; }
         }
 
         .row { display: flex; align-items: center; gap: 6px; }
         .row label { font-size: 11px; font-weight: bold; width: 35px; }
-        input[type="range"] { flex: 1; height: 28px; }
-        .prec-btn { width: 34px; height: 32px; font-size: 16px; border: 1px solid #ccc; background: #fff; border-radius: 6px; }
+        input[type="range"] { flex: 1; height: 30px; }
+        .prec-btn { width: 34px; height: 32px; font-size: 16px; border: 1px solid #ccc; background: #fff; border-radius: 6px; display: flex; align-items: center; justify-content: center; }
         .tool-section { display: flex; justify-content: space-between; gap: 8px; margin-top: 2px; }
         #nudge-grid { display: grid; grid-template-columns: repeat(3, 38px); gap: 3px; }
         #nudge-grid button { height: 38px; font-size: 18px; border: 1px solid #ccc; background: #fff; border-radius: 8px; }
@@ -59,7 +56,7 @@
         <div id="nudge-grid"><span></span><button onclick="nudge(0,-0.1)">↑</button><span></span><button onclick="nudge(-0.1,0)">←</button><button onclick="nudge(0,0.1)">↓</button><button onclick="nudge(0.1,0)">→</button></div>
         <div class="mode-box">
             <button class="save-btn" onclick="exportImage()">画像として保存</button>
-            <div style="display:flex; gap:2px;"><button class="data-btn btn-out" onclick="exportData()">出力</button><button class="data-btn btn-in" onclick="importData()">読込</button><button class="data-btn btn-clr" onclick="clearAll()">リセ</button></div>
+            <div style="display:flex; gap:3px;"><button class="data-btn btn-out" onclick="exportData()">出力</button><button class="data-btn btn-in" onclick="importData()">読込</button><button class="data-btn btn-clr" onclick="clearAll()">リセ</button></div>
             <div class="mode-row"><button id="m-move" onclick="setMode('move')">移動</button><button id="m-pen" onclick="setMode('pen')">ペン</button><button id="m-p-erase" onclick="setMode('p-erase')">線消</button><button id="m-erase" onclick="setMode('erase')">消去</button></div>
         </div>
     </div>
@@ -67,7 +64,7 @@
 <div id="export-overlay" onclick="this.style.display='none'"><img id="export-img" src=""></div>
 
 <script>
-/* ロジック部分は v29.1.6 を完全に継承 */
+/* ロジック部分は安定版 v29.1.6 準拠 */
 const PRESETS = [
     { name: "HQ", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/HQ.png", s: 1.6, o: 1, gw: 2, gh: 2, ox: -0.1, oy: -0.2 },
     { name: "DOOM", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/DOOM.png", s: 1.6, o: -3, gw: 2, gh: 2, ox: -0.2, oy: 0 },
@@ -152,6 +149,9 @@ function handleStart(x, y) {
         if(hitIdx !== -1) {
             selIdx = hitIdx; lockedId = map[selIdx].id; activeAsset = -1;
             document.querySelectorAll('.thumb').forEach(t => t.classList.remove('selected'));
+            // スライダー値を更新
+            document.getElementById('size-s').value = map[selIdx].s;
+            document.getElementById('off-s').value = map[selIdx].off;
         } else if(activeAsset !== -1) {
             const a = assets[activeAsset]; const nx = gx_o - (a.gw-1), ny = gy_o - (a.gh-1);
             if(!isBlocked(nx, ny, a.gw, a.gh)) {
@@ -244,8 +244,8 @@ function deselect() { activeAsset = -1; selIdx = -1; lockedId = null; penStart =
 function setMode(m) { mode = m; penStart = null; document.querySelectorAll('.mode-row button').forEach(b => b.classList.remove('active')); document.getElementById(`m-${m}`).classList.add('active'); render(); }
 function save() { localStorage.setItem('map_v20', JSON.stringify({m:map, l:lines})); }
 function load() { const s = localStorage.getItem('map_v20'); if(s) { const d = JSON.parse(s); map = d.m || []; lines = d.l || []; } }
-function adjS(v) { if(selIdx!==-1){ map[selIdx].s = parseFloat((map[selIdx].s+v).toFixed(2)); save(); render(); } }
-function adjO(v) { if(selIdx!==-1){ map[selIdx].off+=v; save(); render(); } }
+function adjS(v) { if(selIdx!==-1){ map[selIdx].s = parseFloat((map[selIdx].s+v).toFixed(2)); document.getElementById('size-s').value = map[selIdx].s; save(); render(); } }
+function adjO(v) { if(selIdx!==-1){ map[selIdx].off+=v; document.getElementById('off-s').value = map[selIdx].off; save(); render(); } }
 function nudge(dx,dy) { if(selIdx!==-1){ map[selIdx].ox=parseFloat((map[selIdx].ox+dx).toFixed(2)); map[selIdx].oy=parseFloat((map[selIdx].oy+dy).toFixed(2)); save(); render(); } }
 function clearAll() { if(confirm("リセット？")){ map=[]; lines=[]; save(); render(); } }
 function exportData() { prompt("出力", btoa(unescape(encodeURIComponent(JSON.stringify({m:map,l:lines}))))); }
@@ -253,6 +253,12 @@ function importData() { const c = prompt("読込"); if(c) { try { const d = JSON
 function exportImage() { deselect(); render(); const img = document.getElementById('export-img'); img.src = cvs.toDataURL(); document.getElementById('export-overlay').style.display='flex'; }
 function crop(img) { const c = document.createElement('canvas'); const t = c.getContext('2d'); c.width = img.width; c.height = img.height; t.drawImage(img,0,0); const d = t.getImageData(0,0,c.width,c.height).data; let x1=c.width, y1=c.height, x2=0, y2=0; for(let y=0; y<c.height; y++) for(let x=0; x<c.width; x++) if(d[(y*c.width+x)*4+3]>10){ x1=Math.min(x1,x); y1=Math.min(y1,y); x2=Math.max(x2,x); y2=Math.max(y2,y); } const w = x2-x1+1, h = y2-y1+1; const c2 = document.createElement('canvas'); c2.width = w; c2.height = h; c2.getContext('2d').drawImage(img,x1,y1,w,h,0,0,w,h); return c2.toDataURL(); }
 init();
+
+// スライダー操作でのリアルタイム更新
+document.getElementById('size-s').addEventListener('input', (e) => { if(selIdx!==-1){ map[selIdx].s = parseFloat(e.target.value); render(); } });
+document.getElementById('size-s').addEventListener('change', save);
+document.getElementById('off-s').addEventListener('input', (e) => { if(selIdx!==-1){ map[selIdx].off = parseInt(e.target.value); render(); } });
+document.getElementById('off-s').addEventListener('change', save);
 </script>
 </body>
 </html>
