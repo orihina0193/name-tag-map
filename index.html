@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.14 Eraser-Refined</title>
+    <title>避難所レイアウト v29.1.16 Perfect-Line</title>
     <style>
         :root { --panel-h: 240px; --panel-w: 200px; }
         body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; display: flex; flex-direction: column; }
@@ -15,9 +15,7 @@
         .thumb.selected { border-color: #007aff; border-width: 3px; }
         .deselect-btn { width: 45px; height: 45px; border-radius: 6px; border: 1px solid #ccc; background: #eee; color: #666; font-size: 9px; font-weight: bold; flex-shrink: 0; }
         #upload-label { width: 45px; height: 45px; border: 2px dashed #bbb; border-radius: 6px; display: flex; justify-content: center; align-items: center; font-size: 20px; color: #999; flex-shrink: 0; background: #fff; }
-        
         #bot-panel { background: rgba(255,255,255,0.98); border-top: 1px solid #ccc; padding: 8px 10px; box-sizing: border-box; z-index: 100; display: flex; flex-direction: column; gap: 6px; height: var(--panel-h); }
-        
         @media (orientation: landscape) {
             body { flex-direction: row; }
             #bot-panel { width: var(--panel-w); height: 100%; border-top: none; border-left: 1px solid #ccc; padding: 10px 8px; overflow-y: auto; flex-shrink: 0; }
@@ -32,7 +30,6 @@
             .mode-row button { min-width: 38px !important; height: 28px !important; font-size: 9px !important; }
             .data-btn { height: 28px !important; }
         }
-
         .row { display: flex; align-items: center; gap: 8px; }
         .row label { font-size: 11px; font-weight: bold; width: 35px; }
         input[type="range"] { flex: 1; height: 32px; }
@@ -85,23 +82,15 @@ let drag = false, pinch = false, lockedId = null, penStart = null, penCurrent = 
 
 function init() { 
     window.addEventListener('resize', resize); 
-    cam.x = window.innerWidth / 2; 
-    cam.y = window.innerHeight / 3; 
-    resize();
+    cam.x = window.innerWidth / 2; cam.y = window.innerHeight / 3; resize();
     loadPresets().then(() => { load(); render(); }); 
     setupEvents(); 
 }
 
 function resize() { 
-    const newW = cvs.parentElement.clientWidth;
-    const newH = cvs.parentElement.clientHeight;
-    if (cvs.width > 0 && cvs.height > 0) {
-        cam.x += (newW - cvs.width) / 2;
-        cam.y += (newH - cvs.height) / 2;
-    }
-    cvs.width = newW;
-    cvs.height = newH;
-    render(); 
+    const newW = cvs.parentElement.clientWidth, newH = cvs.parentElement.clientHeight;
+    if (cvs.width > 0 && cvs.height > 0) { cam.x += (newW - cvs.width) / 2; cam.y += (newH - cvs.height) / 2; }
+    cvs.width = newW; cvs.height = newH; render(); 
 }
 
 const toS = (gx, gy) => ({ x: (gx - gy) * (T_W/2), y: (gx + gy) * (T_H/2) });
@@ -114,23 +103,16 @@ function render() {
         let s = toS(i,-20), e = toS(i,40); ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(e.x,e.y); ctx.stroke(); 
         s = toS(-20,i); e = toS(40,i); ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(e.x,e.y); ctx.stroke(); 
     }
-    // 線を描画（ドットの集合として扱う）
-    lines.forEach(l => {
-        const p = toS(l.x, l.y);
-        ctx.fillStyle = "rgba(255,0,0,0.6)";
-        ctx.beginPath();
-        const pW = toS(l.x-1, l.y), pE = toS(l.x, l.y-1), pN = toS(l.x-1, l.y-1);
-        ctx.moveTo(p.x, p.y); ctx.lineTo(pW.x, pW.y); ctx.lineTo(pN.x, pN.y); ctx.lineTo(pE.x, pE.y);
-        ctx.fill();
-    });
+    // 線を描画
+    ctx.strokeStyle = "rgba(255,0,0,0.6)"; ctx.lineWidth = 4/cam.z;
+    lines.forEach(l => { const s = toS(l.x1, l.y1), e = toS(l.x2, l.y2); ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke(); });
+    
+    // ラバーバンドプレビュー復活
     if(mode === 'pen' && penStart && penCurrent) {
-        ctx.fillStyle = "rgba(255, 0, 0, 0.3)";
-        const xmin = Math.min(penStart.x, penCurrent.x), xmax = Math.max(penStart.x, penCurrent.x);
-        const ymin = Math.min(penStart.y, penCurrent.y), ymax = Math.max(penStart.y, penCurrent.y);
-        for(let x=xmin; x<=xmax; x++) for(let y=ymin; y<=ymax; y++) {
-            const p = toS(x, y), pW = toS(x-1, y), pE = toS(x, y-1), pN = toS(x-1, y-1);
-            ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(pW.x, pW.y); ctx.lineTo(pN.x, pN.y); ctx.lineTo(pE.x, pE.y); ctx.fill();
-        }
+        ctx.beginPath(); ctx.strokeStyle = "rgba(255, 0, 0, 0.4)"; ctx.setLineDash([5/cam.z, 5/cam.z]);
+        const s = toS(penStart.x, penStart.y), e = toS(penCurrent.x, penCurrent.y);
+        ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = "rgba(255, 0, 0, 0.8)"; ctx.beginPath(); ctx.arc(s.x, s.y, 5/cam.z, 0, Math.PI*2); ctx.fill();
     }
     map.sort((a,b)=>(Math.round(a.x)+Math.round(a.y))-(Math.round(b.x)+Math.round(b.y))).forEach((d, i) => {
         const a = assets[d.aIdx]; if(!a) return;
@@ -148,7 +130,7 @@ function render() {
 function handleStart(x, y) {
     const rawG = toG(x, y), gx_o = Math.floor(rawG.x), gy_o = Math.floor(rawG.y), gx_p = Math.round(rawG.x), gy_p = Math.round(rawG.y);
     if(mode === 'pen') { penStart = {x:gx_p, y:gy_p}; penCurrent = {x:gx_p, y:gy_p}; render(); return; }
-    if(mode === 'p-erase') { lines = lines.filter(l => l.x !== gx_p || l.y !== gy_p); save(); render(); return; }
+    if(mode === 'p-erase') { eraseAt(rawG.x, rawG.y); return; }
     let hitIdx = map.findLastIndex(d => { const a = assets[d.aIdx]; return rawG.x >= d.x && rawG.x < d.x + a.gw && rawG.y >= d.y && rawG.y < d.y + a.gh; });
     if(mode === 'erase' && hitIdx !== -1) { map.splice(hitIdx, 1); selIdx = -1; save(); render(); return; }
     if(mode === 'move') {
@@ -163,24 +145,33 @@ function handleStart(x, y) {
 function handleMove(x, y, dx, dy) {
     const rawG = toG(x, y); 
     if(mode === 'pen' && penStart) { penCurrent = {x: Math.round(rawG.x), y: Math.round(rawG.y)}; render(); return; }
-    if(mode === 'p-erase') { lines = lines.filter(l => l.x !== Math.round(rawG.x) || l.y !== Math.round(rawG.y)); render(); return; }
+    if(mode === 'p-erase') { eraseAt(rawG.x, rawG.y); return; }
     if(lockedId) { const d = map.find(d => d.id === lockedId); if(d) { d.x = Math.floor(rawG.x) - (assets[d.aIdx].gw-1); d.y = Math.floor(rawG.y) - (assets[d.aIdx].gh-1); save(); } }
     else if(drag) { cam.x += dx; cam.y += dy; }
     render();
 }
 function handleEnd() { 
     if(mode === 'pen' && penStart && penCurrent) {
-        const xmin = Math.min(penStart.x, penCurrent.x), xmax = Math.max(penStart.x, penCurrent.x);
-        const ymin = Math.min(penStart.y, penCurrent.y), ymax = Math.max(penStart.y, penCurrent.y);
-        for(let x=xmin; x<=xmax; x++) for(let y=ymin; y<=ymax; y++) if(!lines.some(l=>l.x===x && l.y===y)) lines.push({x,y});
-        save();
+        if(penStart.x !== penCurrent.x || penStart.y !== penCurrent.y) { lines.push({x1:penStart.x, y1:penStart.y, x2:penCurrent.x, y2:penCurrent.y}); save(); }
     }
     drag = pinch = false; lockedId = null; penStart = null; penCurrent = null; render(); 
+}
+function eraseAt(gx, gy) {
+    const threshold = 0.5;
+    const oldLen = lines.length;
+    lines = lines.filter(l => {
+        const dx = l.x2 - l.x1, dy = l.y2 - l.y1, lenSq = dx*dx + dy*dy;
+        if(lenSq === 0) return Math.hypot(l.x1 - gx, l.y1 - gy) > threshold;
+        const t = Math.max(0, Math.min(1, ((gx - l.x1) * dx + (gy - l.y1) * dy) / lenSq));
+        const projX = l.x1 + t * dx, projY = l.y1 + t * dy;
+        return Math.hypot(gx - projX, gy - projY) > threshold;
+    });
+    if(lines.length !== oldLen) { save(); render(); }
 }
 function setupEvents() {
     cvs.addEventListener('touchstart', e => { if(e.touches.length >= 2) { pinch = true; drag = false; lockedId = null; lastDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); return; } const t = e.touches[0]; lastT = {x: t.clientX, y: t.clientY}; handleStart(t.clientX, t.clientY); }, {passive: false});
     cvs.addEventListener('touchmove', e => { e.preventDefault(); if(pinch && e.touches.length >= 2) { const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); cam.z *= (d / lastDist); lastDist = d; } else if(!pinch) { const t = e.touches[0]; handleMove(t.clientX, t.clientY, t.clientX-lastT.x, t.clientY-lastT.y); lastT = {x: t.clientX, y: t.clientY}; } render(); }, {passive: false});
-    cvs.addEventListener('touchend', handleEnd); cvs.addEventListener('mousedown', e => { lastT = {x:e.clientX, y:e.clientY}; handleStart(e.clientX, e.clientY); }); window.addEventListener('mousemove', e => { if(drag || lockedId || penStart || mode==='p-erase' && penStart) handleMove(e.clientX, e.clientY, e.clientX-lastT.x, e.clientY-lastT.y); lastT = {x:e.clientX, y:e.clientY}; }); window.addEventListener('mouseup', handleEnd);
+    cvs.addEventListener('touchend', handleEnd); cvs.addEventListener('mousedown', e => { lastT = {x:e.clientX, y:e.clientY}; handleStart(e.clientX, e.clientY); }); window.addEventListener('mousemove', e => { if(drag || lockedId || penStart || mode==='p-erase') handleMove(e.clientX, e.clientY, e.clientX-lastT.x, e.clientY-lastT.y); lastT = {x:e.clientX, y:e.clientY}; }); window.addEventListener('mouseup', handleEnd);
 }
 async function loadPresets() { for (const p of PRESETS) { await new Promise(res => { const img = new Image(); img.crossOrigin = "anonymous"; img.onload = () => { const src = crop(img), i2 = new Image(); i2.onload = () => { assets.push({ img: i2, src, defS: p.s, defO: p.o, gw: p.gw, gh: p.gh, ox: p.ox, oy: p.oy }); addThumb(assets.length - 1); res(); }; i2.src = src; }; img.src = p.url; }); } }
 function handleFiles(files) { for (const f of files) { const reader = new FileReader(); reader.onload = e => { const img = new Image(); img.onload = () => { const src = crop(img), i2 = new Image(); i2.onload = () => { assets.push({ img: i2, src, defS: 1, defO: 0, gw: 1, gh: 1, ox: 0, oy: 0 }); addThumb(assets.length - 1); }; i2.src = src; }; img.src = e.target.result; }; reader.readAsDataURL(f); } }
