@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.10 UI-Refined</title>
+    <title>避難所レイアウト v29.1.13 Refresh-fix</title>
     <style>
         :root { --panel-h: 240px; --panel-w: 200px; }
         body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; display: flex; flex-direction: column; }
@@ -25,11 +25,12 @@
             .row label { width: 32px !important; font-size: 10px !important; flex-shrink: 0; }
             .row input[type="range"] { flex: 1 !important; min-width: 0; }
             .prec-btn { width: 28px !important; height: 32px !important; flex-shrink: 0; }
-            .tool-section { flex-direction: column; gap: 12px; }
+            .tool-section { flex-direction: column; gap: 8px; }
             #nudge-grid { grid-template-columns: repeat(3, 1fr) !important; width: 100%; max-width: 140px; margin: 0 auto; }
             #nudge-grid button { height: 34px !important; }
-            .save-btn { font-size: 12px !important; height: 34px !important; }
-            .mode-row button { min-width: 38px !important; height: 30px !important; font-size: 9px !important; }
+            .save-btn { font-size: 12px !important; height: 32px !important; margin-bottom: 2px; }
+            .mode-row button { min-width: 38px !important; height: 28px !important; font-size: 9px !important; }
+            .data-btn { height: 28px !important; }
         }
 
         .row { display: flex; align-items: center; gap: 8px; }
@@ -44,7 +45,7 @@
         .mode-row button { flex: 1; min-width: 44px; height: 32px; font-size: 10px; font-weight: bold; border-radius: 6px; border: 1px solid #ccc; background: #fff; }
         .mode-row button.active { background: #007aff; color: #fff; }
         .data-btn { flex: 1; height: 32px; font-size: 10px; font-weight: bold; border-radius: 6px; border: none; color: white; }
-        .btn-out { background: #5856d6; } .btn-in { background: #ff9500; } .btn-clr { background: #ff3b30; }
+        .btn-ref { background: #007aff; } .btn-out { background: #5856d6; } .btn-in { background: #ff9500; } .btn-clr { background: #ff3b30; }
         .save-btn { height: 36px; font-size: 13px; background: #34c759; border: none; border-radius: 6px; color: white; font-weight: bold; }
         #export-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; display: none; flex-direction: column; align-items: center; justify-content: center; }
         #export-img { max-width: 90%; max-height: 75%; border: 2px solid #fff; }
@@ -59,7 +60,7 @@
         <div id="nudge-grid"><span></span><button onclick="nudge(0,-0.1)">↑</button><span></span><button onclick="nudge(-0.1,0)">←</button><button onclick="nudge(0,0.1)">↓</button><button onclick="nudge(0.1,0)">→</button></div>
         <div class="mode-box">
             <button class="save-btn" onclick="exportImage()">画像として保存</button>
-            <div style="display:flex; gap:3px;"><button class="data-btn btn-out" onclick="exportData()">出力</button><button class="data-btn btn-in" onclick="importData()">読込</button><button class="data-btn btn-clr" onclick="clearAll()">リセット</button></div>
+            <div style="display:flex; gap:3px;"><button class="data-btn btn-ref" onclick="resize()">更新</button><button class="data-btn btn-out" onclick="exportData()">出力</button><button class="data-btn btn-in" onclick="importData()">読込</button><button class="data-btn btn-clr" onclick="clearAll()">リセット</button></div>
             <div class="mode-row"><button id="m-move" onclick="setMode('move')">移動</button><button id="m-pen" onclick="setMode('pen')">ペン</button><button id="m-p-erase" onclick="setMode('p-erase')">線消</button><button id="m-erase" onclick="setMode('erase')">消去</button></div>
         </div>
     </div>
@@ -67,7 +68,6 @@
 <div id="export-overlay" onclick="this.style.display='none'"><img id="export-img" src=""></div>
 
 <script>
-/* 安定版ロジック v29.1.6 準拠 */
 const PRESETS = [
     { name: "HQ", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/HQ.png", s: 1.6, o: 1, gw: 2, gh: 2, ox: -0.1, oy: -0.2 },
     { name: "DOOM", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/DOOM.png", s: 1.6, o: -3, gw: 2, gh: 2, ox: -0.2, oy: 0 },
@@ -82,8 +82,32 @@ const cvs = document.getElementById('cvs'); const ctx = cvs.getContext('2d');
 const T_W = 64, T_H = 32;
 let cam = { x: 0, y: 0, z: 1 }, assets = [], map = [], lines = [], selIdx = -1, activeAsset = -1, mode = 'move';
 let drag = false, pinch = false, lockedId = null, penStart = null, penCurrent = null, lastT = {x: 0, y: 0}, lastDist = 0;
-function init() { window.addEventListener('resize', resize); resize(); cam.x = cvs.width/2; cam.y = cvs.height/3; loadPresets().then(() => { load(); render(); }); setupEvents(); }
-function resize() { cvs.width = cvs.parentElement.clientWidth; cvs.height = cvs.parentElement.clientHeight; render(); }
+
+function init() { 
+    window.addEventListener('resize', resize); 
+    cam.x = window.innerWidth / 2; 
+    cam.y = window.innerHeight / 3; 
+    resize();
+    loadPresets().then(() => { load(); render(); }); 
+    setupEvents(); 
+}
+
+function resize() { 
+    // 親要素のサイズを正確に取得
+    const newW = cvs.parentElement.clientWidth;
+    const newH = cvs.parentElement.clientHeight;
+    
+    // 画面中央を維持するための補正
+    if (cvs.width > 0 && cvs.height > 0) {
+        cam.x += (newW - cvs.width) / 2;
+        cam.y += (newH - cvs.height) / 2;
+    }
+
+    cvs.width = newW;
+    cvs.height = newH;
+    render(); 
+}
+
 const toS = (gx, gy) => ({ x: (gx - gy) * (T_W/2), y: (gx + gy) * (T_H/2) });
 const toG = (sx, sy) => { let x = (sx - cam.x)/cam.z, y = (sy - cam.y)/cam.z; let gy = (y/(T_H/2) - x/(T_W/2))/2; return { x: x/(T_W/2) + gy, y: gy }; };
 function isBlocked(gx, gy, gw, gh, ignoreId = null) {
