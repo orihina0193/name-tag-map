@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.18 Stable-Logic</title>
+    <title>避難所レイアウト v29.1.19 Pon-Pon-Build</title>
     <style>
         :root { --panel-h: 240px; --panel-w: 200px; }
         body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; display: flex; flex-direction: column; }
@@ -128,16 +128,25 @@ function handleStart(x, y) {
     if(mode === 'p-erase') { eraseAt(rawG.x, rawG.y); return; }
     let hitIdx = map.findLastIndex(d => { const a = assets[d.aIdx]; return rawG.x >= d.x && rawG.x < d.x + a.gw && rawG.y >= d.y && rawG.y < d.y + a.gh; });
     if(mode === 'erase' && hitIdx !== -1) { map.splice(hitIdx, 1); selIdx = -1; save(); render(); return; }
+    
     if(mode === 'move') {
-        if(hitIdx !== -1) { selIdx = hitIdx; lockedId = map[selIdx].id; activeAsset = -1; document.querySelectorAll('.thumb').forEach(t => t.classList.remove('selected')); document.getElementById('size-s').value = map[selIdx].s; document.getElementById('off-s').value = map[selIdx].off; }
-        else if(activeAsset !== -1) { 
+        // ヒット判定がある場合は選択
+        if(hitIdx !== -1) { 
+            selIdx = hitIdx; lockedId = map[selIdx].id; 
+            document.getElementById('size-s').value = map[selIdx].s; document.getElementById('off-s').value = map[selIdx].off; 
+            render(); return;
+        }
+        // ヒットせず、かつアセットが選ばれているなら新規設置
+        if(activeAsset !== -1) { 
             const a = assets[activeAsset], nx = gx_o - (a.gw-1), ny = gy_o - (a.gh-1);
             if(!isBlocked(nx, ny, a.gw, a.gh)) {
                 const n = {id: Date.now(), x: nx, y: ny, aIdx: activeAsset, s: a.defS, off: a.defO, ox: a.ox, oy: a.oy}; 
-                map.push(n); selIdx = map.length - 1; lockedId = n.id; save();
+                map.push(n); selIdx = -1; lockedId = null; // 連続設置のため選択状態をロックしない
+                save(); render(); return;
             }
-        } else { selIdx = -1; lockedId = null; drag = true; }
-        render();
+        }
+        // 何もなければカメラ移動
+        selIdx = -1; lockedId = null; drag = true; render();
     }
 }
 function handleMove(x, y, dx, dy) {
