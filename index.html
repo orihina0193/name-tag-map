@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.10 UI-Refined</title>
+    <title>避難所レイアウト v29.1.11 UI-Fit</title>
     <style>
-        :root { --panel-h: 240px; --panel-w: 200px; }
+        :root { --panel-h: 240px; --panel-w: 230px; } /* 幅を少し広げて調整 */
         body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; display: flex; flex-direction: column; }
         #main-container { flex: 1; position: relative; overflow: hidden; }
         canvas { display: block; background: #f0f0f0; width: 100%; height: 100%; }
@@ -20,16 +20,17 @@
         
         @media (orientation: landscape) {
             body { flex-direction: row; }
-            #bot-panel { width: var(--panel-w); height: 100%; border-top: none; border-left: 1px solid #ccc; padding: 10px 8px; overflow-y: auto; flex-shrink: 0; }
-            .row { gap: 4px !important; width: 100%; }
-            .row label { width: 32px !important; font-size: 10px !important; flex-shrink: 0; }
-            .row input[type="range"] { flex: 1 !important; min-width: 0; }
-            .prec-btn { width: 28px !important; height: 32px !important; flex-shrink: 0; }
-            .tool-section { flex-direction: column; gap: 12px; }
-            #nudge-grid { grid-template-columns: repeat(3, 1fr) !important; width: 100%; max-width: 140px; margin: 0 auto; }
-            #nudge-grid button { height: 34px !important; }
-            .save-btn { font-size: 12px !important; height: 34px !important; }
-            .mode-row button { min-width: 38px !important; height: 30px !important; font-size: 9px !important; }
+            #bot-panel { width: var(--panel-w); height: 100%; border-top: none; border-left: 1px solid #ccc; padding: 12px 10px; overflow-y: auto; flex-shrink: 0; }
+            .row { gap: 6px !important; width: 100%; }
+            .row label { width: 35px !important; font-size: 11px !important; flex-shrink: 0; }
+            .row input[type="range"] { flex: 1 !important; }
+            .prec-btn { width: 32px !important; height: 34px !important; flex-shrink: 0; }
+            .tool-section { flex-direction: column; gap: 14px; }
+            #nudge-grid { grid-template-columns: repeat(3, 1fr) !important; width: 100%; max-width: 160px; margin: 0 auto; }
+            #nudge-grid button { height: 38px !important; }
+            .save-btn { font-size: 14px !important; height: 40px !important; }
+            .mode-row button { min-width: 45px !important; height: 34px !important; font-size: 10px !important; }
+            .data-btn { height: 34px !important; font-size: 11px !important; }
         }
 
         .row { display: flex; align-items: center; gap: 8px; }
@@ -39,8 +40,8 @@
         .tool-section { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; }
         #nudge-grid { display: grid; grid-template-columns: repeat(3, 40px); gap: 4px; }
         #nudge-grid button { height: 40px; font-size: 18px; border: 1px solid #ccc; background: #fff; border-radius: 8px; }
-        .mode-box { flex: 1; display: flex; flex-direction: column; gap: 6px; }
-        .mode-row { display: flex; gap: 3px; flex-wrap: wrap; }
+        .mode-box { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+        .mode-row { display: flex; gap: 4px; flex-wrap: wrap; }
         .mode-row button { flex: 1; min-width: 44px; height: 32px; font-size: 10px; font-weight: bold; border-radius: 6px; border: 1px solid #ccc; background: #fff; }
         .mode-row button.active { background: #007aff; color: #fff; }
         .data-btn { flex: 1; height: 32px; font-size: 10px; font-weight: bold; border-radius: 6px; border: none; color: white; }
@@ -59,7 +60,7 @@
         <div id="nudge-grid"><span></span><button onclick="nudge(0,-0.1)">↑</button><span></span><button onclick="nudge(-0.1,0)">←</button><button onclick="nudge(0,0.1)">↓</button><button onclick="nudge(0.1,0)">→</button></div>
         <div class="mode-box">
             <button class="save-btn" onclick="exportImage()">画像として保存</button>
-            <div style="display:flex; gap:3px;"><button class="data-btn btn-out" onclick="exportData()">出力</button><button class="data-btn btn-in" onclick="importData()">読込</button><button class="data-btn btn-clr" onclick="clearAll()">リセット</button></div>
+            <div style="display:flex; gap:4px;"><button class="data-btn btn-out" onclick="exportData()">出力</button><button class="data-btn btn-in" onclick="importData()">読込</button><button class="data-btn btn-clr" onclick="clearAll()">リセット</button></div>
             <div class="mode-row"><button id="m-move" onclick="setMode('move')">移動</button><button id="m-pen" onclick="setMode('pen')">ペン</button><button id="m-p-erase" onclick="setMode('p-erase')">線消</button><button id="m-erase" onclick="setMode('erase')">消去</button></div>
         </div>
     </div>
