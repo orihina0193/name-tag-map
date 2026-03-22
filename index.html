@@ -1,165 +1,29 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.32</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
-    <style>
-        :root { --panel-h: 240px; --panel-w: 200px; }
-        body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; display: flex; flex-direction: column; }
-        #main-container { flex: 1; position: relative; overflow: hidden; }
-        canvas { display: block; background: #f0f0f0; width: 100%; height: 100%; }
-        #top-panel { position: absolute; top: 0; width: 100%; height: 65px; background: rgba(255,255,255,0.9); border-bottom: 1px solid #ccc; display: flex; align-items: center; padding: 0 10px; box-sizing: border-box; z-index: 100; gap: 10px; }
-        #cur-box { width: 50px; height: 50px; border: 2px solid #007aff; border-radius: 8px; background: #fff; background-size: contain; background-repeat: no-repeat; background-position: center; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #007aff; font-weight: bold; text-align: center; }
-        #open-list-btn { width: 50px; height: 50px; border-radius: 8px; border: 1px solid #ccc; background: #fff; font-size: 24px; color: #666; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .deselect-btn { height: 50px; padding: 0 10px; border-radius: 8px; border: 1px solid #ccc; background: #eee; color: #666; font-size: 11px; font-weight: bold; flex-shrink: 0; }
-        #asset-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; display: none; align-items: center; justify-content: center; }
-        #asset-modal { width: 90%; max-height: 80%; background: #f0f0f0; border-radius: 12px; padding: 15px; display: flex; flex-direction: column; gap: 15px; }
-        #asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 10px; overflow-y: auto; padding: 5px; }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ccc; padding-bottom: 8px; }
-        .modal-title { font-weight: bold; color: #333; }
-        .close-modal { font-size: 20px; color: #666; padding: 5px; }
-        .thumb { width: 60px; height: 60px; border-radius: 8px; border: 2px solid #ccc; background-size: contain; background-repeat: no-repeat; background-position: center; background-color: #fff; margin: 0 auto; }
-        #modal-upload-label { width: 60px; height: 60px; border: 2px dashed #bbb; border-radius: 8px; display: flex; justify-content: center; align-items: center; font-size: 24px; color: #999; background: #fff; margin: 0 auto; }
-        #bot-panel { background: rgba(255,255,255,0.98); border-top: 1px solid #ccc; padding: 8px 10px; box-sizing: border-box; z-index: 100; display: flex; flex-direction: column; gap: 6px; height: var(--panel-h); }
-        @media (orientation: landscape) { body { flex-direction: row; } #bot-panel { width: var(--panel-w); height: 100%; border-top: none; border-left: 1px solid #ccc; padding: 10px 8px; overflow-y: auto; flex-shrink: 0; } .tool-section { flex-direction: column; gap: 8px; } #nudge-grid { display: grid; grid-template-columns: repeat(3, 1fr); width: 100%; gap: 3px; } }
-        .row { display: flex; align-items: center; gap: 8px; }
-        .row label { font-size: 11px; font-weight: bold; width: 35px; }
-        input[type="range"] { flex: 1; height: 32px; }
-        .prec-btn { width: 34px; height: 32px; font-size: 16px; border: 1px solid #ccc; background: #fff; border-radius: 6px; }
-        .tool-section { display: flex; justify-content: space-between; gap: 8px; }
-        #nudge-grid button { height: 40px; font-size: 18px; border: 1px solid #ccc; background: #fff; border-radius: 8px; }
-        .mode-box { flex: 1; display: flex; flex-direction: column; gap: 6px; }
-        .mode-row { display: flex; gap: 3px; flex-wrap: wrap; }
-        .mode-row button { flex: 1; min-width: 44px; height: 32px; font-size: 10px; font-weight: bold; border-radius: 6px; border: 1px solid #ccc; background: #fff; }
-        .mode-row button.active { background: #007aff; color: #fff; border-color: #007aff; }
-        .data-btn { flex: 1; height: 32px; font-size: 10px; font-weight: bold; border-radius: 6px; border: none; color: white; }
-        .btn-out { background: #5856d6; } .btn-clr { background: #ff3b30; }
-        .save-btn { height: 36px; font-size: 13px; background: #34c759; border: none; border-radius: 6px; color: white; font-weight: bold; }
-        #export-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; display: none; flex-direction: column; align-items: center; justify-content: center; }
-        #export-img { max-width: 90%; max-height: 75%; border: 2px solid #fff; }
-    </style>
-</head>
-<body>
-<div id="main-container">
-    <canvas id="cvs"></canvas>
-    <div id="top-panel">
-        <div id="cur-box">未選択</div>
-        <button id="open-list-btn" onclick="toggleAssetModal(true)">＋</button>
-        <button class="deselect-btn" onclick="deselect()">選択<br>解除</button>
-    </div>
-</div>
-
-<div id="asset-overlay" onclick="if(event.target==this)toggleAssetModal(false)">
-    <div id="asset-modal">
-        <div class="modal-header"><span class="modal-title">アセット倉庫</span><span class="close-modal" onclick="toggleAssetModal(false)">✕</span></div>
-        <div id="asset-grid">
-            <label id="modal-upload-label">📁<input type="file" id="img-in" hidden accept="image/*" multiple onchange="handleFiles(this.files)"></label>
-        </div>
-    </div>
-</div>
-
-<div id="bot-panel">
-    <div class="row"><label>サイズ</label><button class="prec-btn" onclick="adjS(-0.05)">-</button><input type="range" id="size-s" min="0.1" max="5" step="0.05"><button class="prec-btn" onclick="adjS(0.05)">+</button></div>
-    <div class="row"><label>接地</label><button class="prec-btn" onclick="adjO(-1)">-</button><input type="range" id="off-s" min="-100" max="100" step="1"><button class="prec-btn" onclick="adjO(1)">+</button></div>
-    <div class="tool-section">
-        <div id="nudge-grid"><span></span><button onclick="nudge(0,-0.1)">↑</button><span></span><button onclick="nudge(-0.1,0)">←</button><button onclick="nudge(0,0.1)">↓</button><button onclick="nudge(0.1,0)">→</button></div>
-        <div class="mode-box">
-            <button class="save-btn" onclick="exportImage()">画像として保存</button>
-            <div style="display:flex; gap:3px;">
-                <button class="data-btn btn-out" onclick="exportURL()">共有URL</button>
-                <button class="data-btn btn-clr" onclick="clearAll()">リセット</button>
-            </div>
-            <div class="mode-row"><button id="m-move" onclick="setMode('move')">移動</button><button id="m-pen" onclick="setMode('pen')">ペン</button><button id="m-p-erase" onclick="setMode('p-erase')">線消</button><button id="m-erase" onclick="setMode('erase')">建物消去</button></div>
-        </div>
-    </div>
-</div>
-<div id="export-overlay" onclick="this.style.display='none'"><img id="export-img" src=""></div>
-
-<script>
-const PRESETS = [
-    { name: "HQ", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/HQ.png", s: 1.6, o: 1, gw: 2, gh: 2, ox: -0.1, oy: -0.2 },
-    { name: "DOOM", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/DOOM.png", s: 1.6, o: -3, gw: 2, gh: 2, ox: -0.2, oy: 0 },
-    { name: "MED", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/MED.png", s: 1.6, o: -1, gw: 2, gh: 2, ox: -0.1, oy: -0.1 },
-    { name: "SRG", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/SRG.png", s: 1.7, o: -3, gw: 2, gh: 2, ox: -0.1, oy: -0.1 },
-    { name: "RSS", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/RSS.png", s: 1.6, o: -4, gw: 2, gh: 2, ox: -0.2, oy: -0.3 },
-    { name: "ST", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/ST.png", s: 1.6, o: 0, gw: 2, gh: 2, ox: -0.2, oy: -0.2 },
-    { name: "OP", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/OP.png", s: 0.8, o: 0, gw: 1, gh: 1, ox: -0.1, oy: -0.1 },
-    { name: "ROCK2", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/ROCK2.png", s: 0.75, o: -5, gw: 1, gh: 1, ox: 0, oy: 0 }
-];
-
-const cvs = document.getElementById('cvs'); const ctx = cvs.getContext('2d');
-const T_W = 64, T_H = 32;
-let cam = { x: 0, y: 0, z: 1 }, assets = [], map = [], lines = [], selIdx = -1, activeAsset = -1, mode = 'move';
-let drag = false, pinch = false, lockedId = null, penStart = null, penCurrent = null, lastT = {x: 0, y: 0}, lastDist = 0;
-
-function init() { window.addEventListener('resize', resize); resize(); cam.x = cvs.width/2; cam.y = cvs.height/3; loadPresets().then(() => { const params = new URLSearchParams(window.location.search); const urlData = params.get('d'); if (urlData) applyData(urlData); else load(); render(); }); setupEvents(); }
-
-async function exportURL() {
-    const exportMap = map.map(d => {
-        const a = assets[d.aIdx];
-        const isPreset = (a.name !== null && a.name !== undefined);
-        return { n: isPreset ? a.name : null, x: d.x, y: d.y, s: d.s, off: d.off, ox: d.ox, oy: d.oy, src: isPreset ? null : a.src };
-    });
-    const obj = { m: exportMap, l: lines };
-    const compressed = LZString.compressToEncodedURIComponent(JSON.stringify(obj));
-    const baseUrl = window.location.href.split('?')[0];
-    const fullUrl = baseUrl + "?d=" + compressed;
-    try {
-        const res = await fetch(`https://is.gd/create.php?format=json&url=${encodeURIComponent(fullUrl)}`);
-        const data = await res.json();
-        const finalUrl = data.shorturl || fullUrl;
-        await navigator.clipboard.writeText(finalUrl);
-        alert("【共有URLをコピーしました！】");
-    } catch (err) {
-        await navigator.clipboard.writeText(fullUrl);
-        alert("【URLをコピーしました！】");
-    }
-}
-
-function applyData(code) {
-    try {
-        const json = LZString.decompressFromEncodedURIComponent(code);
-        const d = JSON.parse(json);
-        lines = d.l || [];
-        map = d.m.map(item => {
-            let aIdx = assets.findIndex(a => a.name === item.n);
-            if(aIdx === -1 && item.src) {
-                const img = new Image(); img.src = item.src;
-                assets.push({ img, src: item.src, name: null, defS: 1, defO: 0, gw: 1, gh: 1, ox: 0, oy: 0 });
-                addThumb(assets.length - 1); aIdx = assets.length - 1;
-            }
-            return { id: Date.now()+Math.random(), x: item.x, y: item.y, aIdx: aIdx===-1?0:aIdx, s: item.s, off: item.off, ox: item.ox, oy: item.oy };
-        });
-        save(); render();
-    } catch(e) { console.error("Restore error", e); }
-}
-
-function resize() { const nw = cvs.parentElement.clientWidth, nh = cvs.parentElement.clientHeight; if(cvs.width>0){ cam.x+=(nw-cvs.width)/2; cam.y+=(nh-cvs.height)/2; } cvs.width=nw; cvs.height=nh; render(); }
-const toS = (gx, gy) => ({ x: (gx - gy) * (T_W/2), y: (gx + gy) * (T_H/2) });
-const toG = (sx, sy) => { let x = (sx - cam.x)/cam.z, y = (sy - cam.y)/cam.z; let gy = (y/(T_H/2) - x/(T_W/2))/2; return { x: x/(T_W/2) + gy, y: gy }; };
-
-function isBlocked(gx, gy, gw, gh, ignoreId = null) {
-    for (let x = gx; x < gx + gw; x++) for (let y = gy; y < gy + gh; y++) if (map.some(d => d.id !== ignoreId && x >= Math.round(d.x) && x < Math.round(d.x) + assets[d.aIdx].gw && y >= Math.round(d.y) && y < Math.round(d.y) + assets[d.aIdx].gh)) return true;
-    return false;
-}
-
+/* render関数内の枠表示ロジックを、さらに厳格に修正しました */
 function render() {
     ctx.clearRect(0,0,cvs.width,cvs.height); ctx.save(); ctx.translate(cam.x, cam.y); ctx.scale(cam.z, cam.z);
-    ctx.strokeStyle = "rgba(0,0,0,0.08)"; ctx.lineWidth = 1/cam.z;
-    for(let i=-20; i<=40; i++){ let s = toS(i,-20), e = toS(i,40); ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(e.x,e.y); ctx.stroke(); s = toS(-20,i); e = toS(40,i); ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(e.x,e.y); ctx.stroke(); }
-    lines.forEach(l => { ctx.beginPath(); ctx.strokeStyle = "rgba(255,0,0,0.6)"; ctx.lineWidth = 4/cam.z; const s = toS(l.x1, l.y1), e = toS(l.x2, l.y2); ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke(); });
-    if(mode === 'pen' && penStart && penCurrent) { ctx.beginPath(); ctx.strokeStyle = "rgba(255, 0, 0, 0.4)"; ctx.setLineDash([5/cam.z, 5/cam.z]); const s = toS(penStart.x, penStart.y), e = toS(penCurrent.x, penCurrent.y); ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke(); ctx.setLineDash([]); }
     
+    // ... (グリッドと線の描画はそのまま) ...
+
     map.sort((a,b)=>(Math.round(a.x)+Math.round(a.y))-(Math.round(b.x)+Math.round(b.y))).forEach((d, i) => {
-        const a = assets[d.aIdx]; if(!a) return; const w = T_W * d.s, h = (a.img.height/a.img.width) * w, anchor = toS(d.x + a.gw + d.ox, d.y + a.gh + d.oy); 
+        const a = assets[d.aIdx]; if(!a) return; 
+        const w = T_W * d.s, h = (a.img.height/a.img.width) * w, anchor = toS(d.x + a.gw + d.ox, d.y + a.gh + d.oy); 
         ctx.drawImage(a.img, anchor.x - w / 2, anchor.y - h + d.off, w, h);
         
-        // --- 枠描画（ikumiさん好みのキビキビ枠） ---
-        if(selIdx === i && (!lockedId || lockedId === d.id)) {
+        // --- 【ここを修正】枠を表示する条件をより厳しく ---
+        let showFrame = false;
+
+        if (lockedId === d.id) {
+            // 1. 今まさに指で触って動かしている（設置中含む）
+            showFrame = true;
+        } else if (activeAsset === -1 && selIdx === i) {
+            // 2. 「何も設置しようとしていない時」かつ「選んでいる」
+            // つまり、倉庫で何も選んでいない時だけ、古い建物の枠が出る
+            showFrame = true;
+        }
+
+        if(showFrame) { 
             ctx.strokeStyle = "#007aff"; 
-            ctx.lineWidth = (lockedId ? 1 : 3)/cam.z; // 動かしている時は1px、離すと3px
+            ctx.lineWidth = (lockedId ? 1 : 3)/cam.z; 
             const gx = Math.round(d.x), gy = Math.round(d.y), 
                   pS = toS(gx+a.gw, gy+a.gh), pW = toS(gx, gy+a.gh), 
                   pE = toS(gx+a.gw, gy), pN = toS(gx, gy); 
@@ -169,63 +33,3 @@ function render() {
     });
     ctx.restore();
 }
-
-function handleStart(x, y) {
-    const rawG = toG(x, y), gx_o = Math.floor(rawG.x), gy_o = Math.floor(rawG.y), gx_p = Math.round(rawG.x), gy_p = Math.round(rawG.y);
-    if(mode === 'pen') { penStart = {x:gx_p, y:gy_p}; penCurrent = {x:gx_p, y:gy_p}; render(); return; }
-    if(mode === 'p-erase') { lines = lines.filter(l => Math.hypot((l.x1+l.x2)/2-rawG.x,(l.y1+l.y2)/2-rawG.y)>0.5); save(); render(); return; }
-    
-    let hitIdx = map.findLastIndex(d => { const a = assets[d.aIdx]; return rawG.x >= d.x && rawG.x < d.x + a.gw && rawG.y >= d.y && rawG.y < d.y + a.gh; });
-    if(mode === 'erase' && hitIdx !== -1) { map.splice(hitIdx, 1); selIdx = -1; save(); render(); return; }
-    
-    if(mode === 'move') {
-        // 新規設置モード
-        if(activeAsset !== -1) { 
-            const a = assets[activeAsset], nx = gx_o - (a.gw-1), ny = gy_o - (a.gh-1); 
-            if(!isBlocked(nx, ny, a.gw, a.gh)) { 
-                const n = {id: Date.now(), x: nx, y: ny, aIdx: activeAsset, s: a.defS, off: a.defO, ox: a.ox, oy: a.oy}; 
-                map.push(n); 
-                selIdx = map.length - 1; // 設置した瞬間に対象をセレクト！
-                lockedId = n.id; 
-                updatePanel(); save(); render(); return; 
-            } 
-        }
-        // 既存の建物選択
-        if(hitIdx !== -1) { selIdx = hitIdx; lockedId = map[selIdx].id; updatePanel(); render(); return; }
-        
-        selIdx = -1; lockedId = null; drag = true; render();
-    }
-}
-
-function handleMove(x, y, dx, dy) {
-    const rawG = toG(x, y); if(mode === 'pen' && penStart) { penCurrent = {x: Math.round(rawG.x), y: Math.round(rawG.y)}; render(); return; }
-    if(lockedId) { const dIdx = map.findIndex(d => d.id === lockedId); if(dIdx !== -1) { const d = map[dIdx]; const a = assets[d.aIdx], nx = Math.floor(rawG.x) - (a.gw-1), ny = Math.floor(rawG.y) - (a.gh-1); if(!isBlocked(nx, ny, a.gw, a.gh, d.id)) { d.x = nx; d.y = ny; selIdx = dIdx; save(); } } }
-    else if(drag) { cam.x += dx; cam.y += dy; }
-    render();
-}
-
-function handleEnd() { if(mode === 'pen' && penStart && penCurrent && (penStart.x !== penCurrent.x || penStart.y !== penCurrent.y)) { lines.push({x1:penStart.x, y1:penStart.y, x2:penCurrent.x, y2:penCurrent.y}); save(); } drag = pinch = false; lockedId = null; penStart = null; penCurrent = null; render(); }
-
-function toggleAssetModal(show) { document.getElementById('asset-overlay').style.display = show ? 'flex' : 'none'; }
-function updateCurBox() { const box = document.getElementById('cur-box'); if(activeAsset !== -1) { box.style.backgroundImage = `url(${assets[activeAsset].src})`; box.textContent = ''; } else { box.style.backgroundImage = 'none'; box.textContent = '未選択'; } }
-function addThumb(idx) { const d = document.createElement('div'); d.className = 'thumb'; d.style.backgroundImage = `url(${assets[idx].src})`; d.onclick = () => { activeAsset = idx; selIdx = -1; lockedId = null; setMode('move'); updateCurBox(); toggleAssetModal(false); render(); }; document.getElementById('asset-grid').appendChild(d); }
-function deselect() { activeAsset = -1; selIdx = -1; lockedId = null; updateCurBox(); render(); }
-async function loadPresets() { for (const p of PRESETS) { await new Promise(res => { const img = new Image(); img.crossOrigin = "anonymous"; img.onload = () => { const src = crop(img), i2 = new Image(); i2.onload = () => { assets.push({ img: i2, src, name: p.name, defS: p.s, defO: p.o, gw: p.gw, gh: p.gh, ox: p.ox, oy: p.oy }); addThumb(assets.length - 1); res(); }; i2.src = src; }; img.src = p.url; }); } }
-function handleFiles(files) { for (const f of files) { const reader = new FileReader(); reader.onload = e => { const img = new Image(); img.onload = () => { const src = crop(img), i2 = new Image(); i2.onload = () => { assets.push({ img: i2, src, name: null, defS: 1, defO: 0, gw: 1, gh: 1, ox: 0, oy: 0 }); addThumb(assets.length - 1); }; i2.src = src; }; img.src = e.target.result; }; reader.readAsDataURL(f); } }
-function setupEvents() { cvs.addEventListener('touchstart', e => { if(e.touches.length >= 2) { pinch = true; drag = false; lastDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); return; } const t = e.touches[0]; lastT = {x: t.clientX, y: t.clientY}; handleStart(t.clientX, t.clientY); }, {passive: false}); cvs.addEventListener('touchmove', e => { e.preventDefault(); if(pinch && e.touches.length >= 2) { const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); cam.z *= (d / lastDist); lastDist = d; } else if(!pinch) { const t = e.touches[0]; handleMove(t.clientX, t.clientY, t.clientX-lastT.x, t.clientY-lastT.y); lastT = {x: t.clientX, y: t.clientY}; } render(); }, {passive: false}); cvs.addEventListener('touchend', handleEnd); }
-function setMode(m) { mode = m; document.querySelectorAll('.mode-row button').forEach(b => b.classList.remove('active')); document.getElementById(`m-${m}`).classList.add('active'); render(); }
-function save() { localStorage.setItem('map_v20', JSON.stringify({m:map, l:lines})); }
-function load() { const s = localStorage.getItem('map_v20'); if(s) { const d = JSON.parse(s); map = d.m || []; lines = d.l || []; } }
-function updatePanel() { if(selIdx!==-1){ document.getElementById('size-s').value = map[selIdx].s; document.getElementById('off-s').value = map[selIdx].off; } }
-function adjS(v) { if(selIdx!==-1){ map[selIdx].s = parseFloat((map[selIdx].s+v).toFixed(2)); updatePanel(); save(); render(); } }
-function adjO(v) { if(selIdx!==-1){ map[selIdx].off+=v; updatePanel(); save(); render(); } }
-function nudge(dx,dy) { if(selIdx!==-1){ map[selIdx].ox=parseFloat((map[selIdx].ox+dx).toFixed(2)); map[selIdx].oy=parseFloat((map[selIdx].oy+dy).toFixed(2)); save(); render(); } }
-function clearAll() { if(confirm("配置をすべて消去（リセット）しますか？")){ map=[]; lines=[]; selIdx=-1; lockedId=null; save(); render(); } }
-function exportImage() { deselect(); render(); const img = document.getElementById('export-img'); img.src = cvs.toDataURL(); document.getElementById('export-overlay').style.display='flex'; }
-function crop(img) { const c = document.createElement('canvas'), t = c.getContext('2d'); c.width = img.width; c.height = img.height; t.drawImage(img,0,0); const d = t.getImageData(0,0,c.width,c.height).data; let x1=c.width, y1=c.height, x2=0, y2=0; for(let y=0; y<c.height; y++) for(let x=0; x<c.width; x++) if(d[(y*c.width+x)*4+3]>10){ x1=Math.min(x1,x); y1=Math.min(y1,y); x2=Math.max(x2,x); y2=Math.max(y2,y); } const w = x2-x1+1, h = y2-y1+1, c2 = document.createElement('canvas'); c2.width = w; c2.height = h; c2.getContext('2d').drawImage(img,x1,y1,w,h,0,0,w,h); return c2.toDataURL(); }
-init();
-document.getElementById('size-s').addEventListener('input', (e) => { if(selIdx!==-1){ map[selIdx].s = parseFloat(e.target.value); render(); } });
-document.getElementById('off-s').addEventListener('input', (e) => { if(selIdx!==-1){ map[selIdx].off = parseInt(e.target.value); render(); } });
-</script>
-</body>
-</html>
