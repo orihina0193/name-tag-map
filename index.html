@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.23</title>
+    <title>避難所レイアウト v29.1.25</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
         :root { --panel-h: 240px; --panel-w: 200px; }
@@ -76,7 +76,7 @@
         <div class="mode-box">
             <button class="save-btn" onclick="exportImage()">画像として保存</button>
             <div style="display:flex; gap:3px;">
-                <button class="data-btn btn-out" onclick="exportData()">コピー</button>
+                <button class="data-btn btn-out" onclick="exportURL()">共有URL</button>
                 <button class="data-btn btn-in" onclick="importData()">読込</button>
                 <button class="data-btn btn-clr" onclick="clearAll()">消去</button>
             </div>
@@ -103,33 +103,48 @@ const T_W = 64, T_H = 32;
 let cam = { x: 0, y: 0, z: 1 }, assets = [], map = [], lines = [], selIdx = -1, activeAsset = -1, mode = 'move';
 let drag = false, pinch = false, lockedId = null, penStart = null, penCurrent = null, lastT = {x: 0, y: 0}, lastDist = 0;
 
-function init() { window.addEventListener('resize', resize); resize(); cam.x = cvs.width/2; cam.y = cvs.height/3; loadPresets().then(() => { load(); render(); }); setupEvents(); }
+function init() {
+    window.addEventListener('resize', resize); resize();
+    cam.x = cvs.width/2; cam.y = cvs.height/3;
+    loadPresets().then(() => {
+        // 起動時にURLパラメータを確認
+        const params = new URLSearchParams(window.location.search);
+        const urlData = params.get('d');
+        if (urlData) applyData(urlData);
+        else load();
+        render();
+    });
+    setupEvents();
+}
 
-// ★最強の出力：圧縮＋自動クリップボード
-async function exportData() {
+// URL共有 & 短縮URL発行
+async function exportURL() {
     const exportMap = map.map(d => {
         const a = assets[d.aIdx];
-        const isPreset = a.name !== null && a.name !== undefined;
+        const isPreset = (a.name !== null && a.name !== undefined);
         return { n: isPreset ? a.name : null, x: d.x, y: d.y, s: d.s, off: d.off, ox: d.ox, oy: d.oy, src: isPreset ? null : a.src };
     });
     const obj = { m: exportMap, l: lines };
-    const json = JSON.stringify(obj);
-    
-    // LZStringで圧縮
-    const compressed = LZString.compressToEncodedURIComponent(json);
+    const compressed = LZString.compressToEncodedURIComponent(JSON.stringify(obj));
+    const baseUrl = window.location.href.split('?')[0];
+    const fullUrl = baseUrl + "?d=" + compressed;
 
     try {
-        await navigator.clipboard.writeText(compressed);
-        alert("【コピー成功！】\nそのままLINEやメモ帳に貼り付けられます。");
+        const res = await fetch(`https://is.gd/create.php?format=json&url=${encodeURIComponent(fullUrl)}`);
+        const data = await res.json();
+        const finalUrl = data.shorturl || fullUrl;
+        await navigator.clipboard.writeText(finalUrl);
+        alert("【共有URLをコピーしました！】\n" + finalUrl + "\n\nLINEに貼り付けて送れば、相手がクリックするだけでこの配置が開きます！");
     } catch (err) {
-        prompt("コピーに失敗しました。この枠の中を全選択してコピーしてください：", compressed);
+        await navigator.clipboard.writeText(fullUrl);
+        alert("【URLをコピーしました！】\n(短縮に失敗しましたが、このままLINEに貼れます)");
     }
 }
 
-function importData() {
-    const id = prompt("コードを貼り付けてください"); if(!id) return;
+// データ解析・適用
+function applyData(code) {
     try {
-        const json = LZString.decompressFromEncodedURIComponent(id);
+        const json = LZString.decompressFromEncodedURIComponent(code);
         const d = JSON.parse(json);
         lines = d.l || [];
         map = d.m.map(item => {
@@ -142,10 +157,21 @@ function importData() {
             return { id: Date.now()+Math.random(), x: item.x, y: item.y, aIdx: aIdx===-1?0:aIdx, s: item.s, off: item.off, ox: item.ox, oy: item.oy };
         });
         save(); render();
-    } catch(e) { alert("無効なコード、または壊れたデータです"); }
+    } catch(e) { console.error("Restore error", e); }
 }
 
-// 基本機能
+function importData() {
+    let input = prompt("共有URL、または暗号コードを貼り付けてください");
+    if(!input) return;
+    let code = input;
+    if (input.includes("?d=")) {
+        const parts = input.split("?d=");
+        code = parts[1] ? parts[1].split("&")[0] : input;
+    }
+    applyData(code);
+}
+
+// 以下、基本ロジック
 function resize() { const nw = cvs.parentElement.clientWidth, nh = cvs.parentElement.clientHeight; if(cvs.width>0){ cam.x+=(nw-cvs.width)/2; cam.y+=(nh-cvs.height)/2; } cvs.width=nw; cvs.height=nh; render(); }
 const toS = (gx, gy) => ({ x: (gx - gy) * (T_W/2), y: (gx + gy) * (T_H/2) });
 const toG = (sx, sy) => { let x = (sx - cam.x)/cam.z, y = (sy - cam.y)/cam.z; let gy = (y/(T_H/2) - x/(T_W/2))/2; return { x: x/(T_W/2) + gy, y: gy }; };
