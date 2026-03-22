@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.27</title>
+    <title>避難所レイアウト v29.1.29</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
         :root { --panel-h: 240px; --panel-w: 200px; }
@@ -69,9 +69,9 @@
             <button class="save-btn" onclick="exportImage()">画像として保存</button>
             <div style="display:flex; gap:3px;">
                 <button class="data-btn btn-out" onclick="exportURL()">共有URL</button>
-                <button class="data-btn btn-clr" onclick="clearAll()">消去</button>
+                <button class="data-btn btn-clr" onclick="clearAll()">リセット</button>
             </div>
-            <div class="mode-row"><button id="m-move" onclick="setMode('move')">移動</button><button id="m-pen" onclick="setMode('pen')">ペン</button><button id="m-p-erase" onclick="setMode('p-erase')">ペン消し</button><button id="m-erase" onclick="setMode('erase')">消去</button></div>
+            <div class="mode-row"><button id="m-move" onclick="setMode('move')">移動</button><button id="m-pen" onclick="setMode('pen')">ペン</button><button id="m-p-erase" onclick="setMode('p-erase')">線消</button><button id="m-erase" onclick="setMode('erase')">建物消去</button></div>
         </div>
     </div>
 </div>
@@ -111,7 +111,7 @@ async function exportURL() {
         const data = await res.json();
         const finalUrl = data.shorturl || fullUrl;
         await navigator.clipboard.writeText(finalUrl);
-        alert("【共有URLをコピーしました！】\n" + finalUrl + "\n\nLINEに送ればタップで開けます。");
+        alert("【共有URLをコピーしました！】");
     } catch (err) {
         await navigator.clipboard.writeText(fullUrl);
         alert("【URLをコピーしました！】");
@@ -140,58 +140,42 @@ function resize() { const nw = cvs.parentElement.clientWidth, nh = cvs.parentEle
 const toS = (gx, gy) => ({ x: (gx - gy) * (T_W/2), y: (gx + gy) * (T_H/2) });
 const toG = (sx, sy) => { let x = (sx - cam.x)/cam.z, y = (sy - cam.y)/cam.z; let gy = (y/(T_H/2) - x/(T_W/2))/2; return { x: x/(T_W/2) + gy, y: gy }; };
 function isBlocked(gx, gy, gw, gh, ignoreId = null) {
-    for (let x = gx; x < gx + gw; x++) {
-        for (let y = gy; y < gy + gh; y++) {
-            if (map.some(d => d.id !== ignoreId && x >= Math.round(d.x) && x < Math.round(d.x) + assets[d.aIdx].gw && y >= Math.round(d.y) && y < Math.round(d.y) + assets[d.aIdx].gh)) return true;
-        }
-    }
+    for (let x = gx; x < gx + gw; x++) for (let y = gy; y < gy + gh; y++) if (map.some(d => d.id !== ignoreId && x >= Math.round(d.x) && x < Math.round(d.x) + assets[d.aIdx].gw && y >= Math.round(d.y) && y < Math.round(d.y) + assets[d.aIdx].gh)) return true;
     return false;
 }
 function render() {
     ctx.clearRect(0,0,cvs.width,cvs.height); ctx.save(); ctx.translate(cam.x, cam.y); ctx.scale(cam.z, cam.z);
     ctx.strokeStyle = "rgba(0,0,0,0.08)"; ctx.lineWidth = 1/cam.z;
     for(let i=-20; i<=40; i++){ let s = toS(i,-20), e = toS(i,40); ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(e.x,e.y); ctx.stroke(); s = toS(-20,i); e = toS(40,i); ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(e.x,e.y); ctx.stroke(); }
-    ctx.strokeStyle = "rgba(255,0,0,0.6)"; ctx.lineWidth = 4/cam.z;
-    lines.forEach(l => { const s = toS(l.x1, l.y1), e = toS(l.x2, l.y2); ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke(); });
+    lines.forEach(l => { ctx.beginPath(); ctx.strokeStyle = "rgba(255,0,0,0.6)"; ctx.lineWidth = 4/cam.z; const s = toS(l.x1, l.y1), e = toS(l.x2, l.y2); ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke(); });
     if(mode === 'pen' && penStart && penCurrent) { ctx.beginPath(); ctx.strokeStyle = "rgba(255, 0, 0, 0.4)"; ctx.setLineDash([5/cam.z, 5/cam.z]); const s = toS(penStart.x, penStart.y), e = toS(penCurrent.x, penCurrent.y); ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke(); ctx.setLineDash([]); }
     map.sort((a,b)=>(Math.round(a.x)+Math.round(a.y))-(Math.round(b.x)+Math.round(b.y))).forEach((d, i) => {
-        const a = assets[d.aIdx]; if(!a) return;
-        const w = T_W * d.s, h = (a.img.height/a.img.width) * w, anchor = toS(d.x + a.gw + d.ox, d.y + a.gh + d.oy); 
+        const a = assets[d.aIdx]; if(!a) return; const w = T_W * d.s, h = (a.img.height/a.img.width) * w, anchor = toS(d.x + a.gw + d.ox, d.y + a.gh + d.oy); 
         ctx.drawImage(a.img, anchor.x - w / 2, anchor.y - h + d.off, w, h);
-        // 【枠修正】選択中なら常に最新の位置に枠を描画
-        if(selIdx === i || (lockedId && d.id === lockedId)) { ctx.strokeStyle = "#007aff"; ctx.lineWidth = 3/cam.z; const gx = Math.round(d.x), gy = Math.round(d.y), pS = toS(gx+a.gw, gy+a.gh), pW = toS(gx, gy+a.gh), pE = toS(gx+a.gw, gy), pN = toS(gx, gy); ctx.beginPath(); ctx.moveTo(pS.x,pS.y); ctx.lineTo(pW.x,pW.y); ctx.lineTo(pN.x,pN.y); ctx.lineTo(pE.x,pE.y); ctx.closePath(); ctx.stroke(); }
+        // 【v29.1.13 logic】選択中なら枠を描画。lockedIdがあれば細く、なければ太く
+        if(selIdx === i && (!lockedId || lockedId === d.id)) { ctx.strokeStyle = "#007aff"; ctx.lineWidth = (lockedId ? 1 : 3)/cam.z; const gx = Math.round(d.x), gy = Math.round(d.y), pS = toS(gx+a.gw, gy+a.gh), pW = toS(gx, gy+a.gh), pE = toS(gx+a.gw, gy), pN = toS(gx, gy); ctx.beginPath(); ctx.moveTo(pS.x,pS.y); ctx.lineTo(pW.x,pW.y); ctx.lineTo(pN.x,pN.y); ctx.lineTo(pE.x,pE.y); ctx.closePath(); ctx.stroke(); }
     });
     ctx.restore();
 }
 function handleStart(x, y) {
     const rawG = toG(x, y), gx_o = Math.floor(rawG.x), gy_o = Math.floor(rawG.y), gx_p = Math.round(rawG.x), gy_p = Math.round(rawG.y);
     if(mode === 'pen') { penStart = {x:gx_p, y:gy_p}; penCurrent = {x:gx_p, y:gy_p}; render(); return; }
-    if(mode === 'p-erase') { eraseAt(rawG.x, rawG.y); return; }
+    if(mode === 'p-erase') { lines = lines.filter(l => Math.hypot((l.x1+l.x2)/2-rawG.x,(l.y1+l.y2)/2-rawG.y)>0.5); save(); render(); return; }
     let hitIdx = map.findLastIndex(d => { const a = assets[d.aIdx]; return rawG.x >= d.x && rawG.x < d.x + a.gw && rawG.y >= d.y && rawG.y < d.y + a.gh; });
     if(mode === 'erase' && hitIdx !== -1) { map.splice(hitIdx, 1); selIdx = -1; save(); render(); return; }
     if(mode === 'move') {
         if(hitIdx !== -1) { selIdx = hitIdx; lockedId = map[selIdx].id; updatePanel(); render(); return; }
-        if(activeAsset !== -1) { 
-            const a = assets[activeAsset], nx = gx_o - (a.gw-1), ny = gy_o - (a.gh-1);
-            if(!isBlocked(nx, ny, a.gw, a.gh)) { const n = {id: Date.now(), x: nx, y: ny, aIdx: activeAsset, s: a.defS, off: a.defO, ox: a.ox, oy: a.oy}; map.push(n); selIdx = map.length - 1; lockedId = n.id; save(); render(); return; }
-        }
+        if(activeAsset !== -1) { const a = assets[activeAsset], nx = gx_o - (a.gw-1), ny = gy_o - (a.gh-1); if(!isBlocked(nx, ny, a.gw, a.gh)) { const n = {id: Date.now(), x: nx, y: ny, aIdx: activeAsset, s: a.defS, off: a.defO, ox: a.ox, oy: a.oy}; map.push(n); selIdx = map.length - 1; lockedId = n.id; save(); render(); return; } }
         selIdx = -1; lockedId = null; drag = true; render();
     }
 }
 function handleMove(x, y, dx, dy) {
     const rawG = toG(x, y); if(mode === 'pen' && penStart) { penCurrent = {x: Math.round(rawG.x), y: Math.round(rawG.y)}; render(); return; }
-    if(lockedId) { 
-        const dIdx = map.findIndex(d => d.id === lockedId); 
-        if(dIdx !== -1) { 
-            const d = map[dIdx]; const a = assets[d.aIdx], nx = Math.floor(rawG.x) - (a.gw-1), ny = Math.floor(rawG.y) - (a.gh-1); 
-            if(!isBlocked(nx, ny, a.gw, a.gh, d.id)) { d.x = nx; d.y = ny; selIdx = dIdx; save(); } 
-        } 
-    }
+    if(lockedId) { const dIdx = map.findIndex(d => d.id === lockedId); if(dIdx !== -1) { const d = map[dIdx]; const a = assets[d.aIdx], nx = Math.floor(rawG.x) - (a.gw-1), ny = Math.floor(rawG.y) - (a.gh-1); if(!isBlocked(nx, ny, a.gw, a.gh, d.id)) { d.x = nx; d.y = ny; selIdx = dIdx; save(); } } }
     else if(drag) { cam.x += dx; cam.y += dy; }
     render();
 }
-function handleEnd() { if(mode === 'pen' && penStart && penCurrent) { if(penStart.x !== penCurrent.x || penStart.y !== penCurrent.y) { lines.push({x1:penStart.x, y1:penStart.y, x2:penCurrent.x, y2:penCurrent.y}); save(); } } drag = pinch = false; lockedId = null; penStart = null; penCurrent = null; render(); }
-function eraseAt(gx, gy) { const threshold = 0.5; lines = lines.filter(l => { const dx = l.x2 - l.x1, dy = l.y2 - l.y1, lenSq = dx*dx + dy*dy, t = Math.max(0, Math.min(1, ((gx - l.x1) * dx + (gy - l.y1) * dy) / (lenSq || 1))); return Math.hypot(gx - (l.x1 + t * dx), gy - (l.y1 + t * dy)) > threshold; }); save(); render(); }
+function handleEnd() { if(mode === 'pen' && penStart && penCurrent && (penStart.x !== penCurrent.x || penStart.y !== penCurrent.y)) { lines.push({x1:penStart.x, y1:penStart.y, x2:penCurrent.x, y2:penCurrent.y}); save(); } drag = pinch = false; lockedId = null; penStart = null; penCurrent = null; render(); }
 function toggleAssetModal(show) { document.getElementById('asset-overlay').style.display = show ? 'flex' : 'none'; }
 function updateCurBox() { const box = document.getElementById('cur-box'); if(activeAsset !== -1) { box.style.backgroundImage = `url(${assets[activeAsset].src})`; box.textContent = ''; } else { box.style.backgroundImage = 'none'; box.textContent = '未選択'; } }
 function addThumb(idx) { const d = document.createElement('div'); d.className = 'thumb'; d.style.backgroundImage = `url(${assets[idx].src})`; d.onclick = () => { activeAsset = idx; selIdx = -1; lockedId = null; setMode('move'); updateCurBox(); toggleAssetModal(false); render(); }; document.getElementById('asset-grid').appendChild(d); }
@@ -206,7 +190,7 @@ function updatePanel() { if(selIdx!==-1){ document.getElementById('size-s').valu
 function adjS(v) { if(selIdx!==-1){ map[selIdx].s = parseFloat((map[selIdx].s+v).toFixed(2)); updatePanel(); save(); render(); } }
 function adjO(v) { if(selIdx!==-1){ map[selIdx].off+=v; updatePanel(); save(); render(); } }
 function nudge(dx,dy) { if(selIdx!==-1){ map[selIdx].ox=parseFloat((map[selIdx].ox+dx).toFixed(2)); map[selIdx].oy=parseFloat((map[selIdx].oy+dy).toFixed(2)); save(); render(); } }
-function clearAll() { if(confirm("配置をすべて消去しますか？")){ map=[]; lines=[]; save(); render(); } }
+function clearAll() { if(confirm("配置をすべて消去（リセット）しますか？")){ map=[]; lines=[]; selIdx=-1; lockedId=null; save(); render(); } }
 function exportImage() { deselect(); render(); const img = document.getElementById('export-img'); img.src = cvs.toDataURL(); document.getElementById('export-overlay').style.display='flex'; }
 function crop(img) { const c = document.createElement('canvas'), t = c.getContext('2d'); c.width = img.width; c.height = img.height; t.drawImage(img,0,0); const d = t.getImageData(0,0,c.width,c.height).data; let x1=c.width, y1=c.height, x2=0, y2=0; for(let y=0; y<c.height; y++) for(let x=0; x<c.width; x++) if(d[(y*c.width+x)*4+3]>10){ x1=Math.min(x1,x); y1=Math.min(y1,y); x2=Math.max(x2,x); y2=Math.max(y2,y); } const w = x2-x1+1, h = y2-y1+1, c2 = document.createElement('canvas'); c2.width = w; c2.height = h; c2.getContext('2d').drawImage(img,x1,y1,w,h,0,0,w,h); return c2.toDataURL(); }
 init();
