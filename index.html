@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.17 Continuous-Build</title>
+    <title>避難所レイアウト v29.1.18 Stable-Logic</title>
     <style>
         :root { --panel-h: 240px; --panel-w: 200px; }
         body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; display: flex; flex-direction: column; }
@@ -80,21 +80,19 @@ const T_W = 64, T_H = 32;
 let cam = { x: 0, y: 0, z: 1 }, assets = [], map = [], lines = [], selIdx = -1, activeAsset = -1, mode = 'move';
 let drag = false, pinch = false, lockedId = null, penStart = null, penCurrent = null, lastT = {x: 0, y: 0}, lastDist = 0;
 
-function init() { 
-    window.addEventListener('resize', resize); 
-    cam.x = window.innerWidth / 2; cam.y = window.innerHeight / 3; resize();
-    loadPresets().then(() => { load(); render(); }); 
-    setupEvents(); 
-}
-
-function resize() { 
-    const newW = cvs.parentElement.clientWidth, newH = cvs.parentElement.clientHeight;
-    if (cvs.width > 0 && cvs.height > 0) { cam.x += (newW - cvs.width) / 2; cam.y += (newH - cvs.height) / 2; }
-    cvs.width = newW; cvs.height = newH; render(); 
-}
-
+function init() { window.addEventListener('resize', resize); resize(); cam.x = cvs.width/2; cam.y = cvs.height/3; loadPresets().then(() => { load(); render(); }); setupEvents(); }
+function resize() { const nw = cvs.parentElement.clientWidth, nh = cvs.parentElement.clientHeight; if(cvs.width>0){ cam.x+=(nw-cvs.width)/2; cam.y+=(nh-cvs.height)/2; } cvs.width=nw; cvs.height=nh; render(); }
 const toS = (gx, gy) => ({ x: (gx - gy) * (T_W/2), y: (gx + gy) * (T_H/2) });
 const toG = (sx, sy) => { let x = (sx - cam.x)/cam.z, y = (sy - cam.y)/cam.z; let gy = (y/(T_H/2) - x/(T_W/2))/2; return { x: x/(T_W/2) + gy, y: gy }; };
+
+function isBlocked(gx, gy, gw, gh, ignoreId = null) {
+    for (let x = gx; x < gx + gw; x++) {
+        for (let y = gy; y < gy + gh; y++) {
+            if (map.some(d => d.id !== ignoreId && x >= Math.round(d.x) && x < Math.round(d.x) + assets[d.aIdx].gw && y >= Math.round(d.y) && y < Math.round(d.y) + assets[d.aIdx].gh)) return true;
+        }
+    }
+    return false;
+}
 
 function render() {
     ctx.clearRect(0,0,cvs.width,cvs.height); ctx.save(); ctx.translate(cam.x, cam.y); ctx.scale(cam.z, cam.z);
@@ -109,6 +107,7 @@ function render() {
         ctx.beginPath(); ctx.strokeStyle = "rgba(255, 0, 0, 0.4)"; ctx.setLineDash([5/cam.z, 5/cam.z]);
         const s = toS(penStart.x, penStart.y), e = toS(penCurrent.x, penCurrent.y);
         ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = "rgba(255, 0, 0, 0.8)"; ctx.beginPath(); ctx.arc(s.x, s.y, 5/cam.z, 0, Math.PI*2); ctx.fill();
     }
     map.sort((a,b)=>(Math.round(a.x)+Math.round(a.y))-(Math.round(b.x)+Math.round(b.y))).forEach((d, i) => {
         const a = assets[d.aIdx]; if(!a) return;
@@ -130,18 +129,14 @@ function handleStart(x, y) {
     let hitIdx = map.findLastIndex(d => { const a = assets[d.aIdx]; return rawG.x >= d.x && rawG.x < d.x + a.gw && rawG.y >= d.y && rawG.y < d.y + a.gh; });
     if(mode === 'erase' && hitIdx !== -1) { map.splice(hitIdx, 1); selIdx = -1; save(); render(); return; }
     if(mode === 'move') {
-        if(activeAsset !== -1) { 
-            // 建物選択中なら、既存建物のヒットに関わらず新規設置を優先
+        if(hitIdx !== -1) { selIdx = hitIdx; lockedId = map[selIdx].id; activeAsset = -1; document.querySelectorAll('.thumb').forEach(t => t.classList.remove('selected')); document.getElementById('size-s').value = map[selIdx].s; document.getElementById('off-s').value = map[selIdx].off; }
+        else if(activeAsset !== -1) { 
             const a = assets[activeAsset], nx = gx_o - (a.gw-1), ny = gy_o - (a.gh-1);
-            const n = {id: Date.now(), x: nx, y: ny, aIdx: activeAsset, s: a.defS, off: a.defO, ox: a.ox, oy: a.oy}; 
-            map.push(n); selIdx = map.length - 1; lockedId = n.id; save();
-        } else if(hitIdx !== -1) { 
-            // 何も選択していない状態で建物を触ったら移動モード
-            selIdx = hitIdx; lockedId = map[selIdx].id; 
-            document.getElementById('size-s').value = map[selIdx].s; document.getElementById('off-s').value = map[selIdx].off; 
-        } else { 
-            selIdx = -1; lockedId = null; drag = true; 
-        }
+            if(!isBlocked(nx, ny, a.gw, a.gh)) {
+                const n = {id: Date.now(), x: nx, y: ny, aIdx: activeAsset, s: a.defS, off: a.defO, ox: a.ox, oy: a.oy}; 
+                map.push(n); selIdx = map.length - 1; lockedId = n.id; save();
+            }
+        } else { selIdx = -1; lockedId = null; drag = true; }
         render();
     }
 }
@@ -149,7 +144,13 @@ function handleMove(x, y, dx, dy) {
     const rawG = toG(x, y); 
     if(mode === 'pen' && penStart) { penCurrent = {x: Math.round(rawG.x), y: Math.round(rawG.y)}; render(); return; }
     if(mode === 'p-erase') { eraseAt(rawG.x, rawG.y); return; }
-    if(lockedId) { const d = map.find(d => d.id === lockedId); if(d) { d.x = Math.floor(rawG.x) - (assets[d.aIdx].gw-1); d.y = Math.floor(rawG.y) - (assets[d.aIdx].gh-1); save(); } }
+    if(lockedId) { 
+        const d = map.find(d => d.id === lockedId); 
+        if(d) { 
+            const a = assets[d.aIdx], nx = Math.floor(rawG.x) - (a.gw-1), ny = Math.floor(rawG.y) - (a.gh-1);
+            if(!isBlocked(nx, ny, a.gw, a.gh, d.id)) { d.x = nx; d.y = ny; save(); } 
+        } 
+    }
     else if(drag) { cam.x += dx; cam.y += dy; }
     render();
 }
