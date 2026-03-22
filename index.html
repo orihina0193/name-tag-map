@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.30</title>
+    <title>避難所レイアウト v29.1.32</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
         :root { --panel-h: 240px; --panel-w: 200px; }
@@ -32,8 +32,8 @@
         #nudge-grid button { height: 40px; font-size: 18px; border: 1px solid #ccc; background: #fff; border-radius: 8px; }
         .mode-box { flex: 1; display: flex; flex-direction: column; gap: 6px; }
         .mode-row { display: flex; gap: 3px; flex-wrap: wrap; }
-        .mode-row button { flex: 1; min-width: 44px; height: 32px; font-size: 10px; font-weight: bold; border-radius: 6px; border: 1px solid #ccc; }
-        .mode-row button.active { background: #007aff; color: #fff; }
+        .mode-row button { flex: 1; min-width: 44px; height: 32px; font-size: 10px; font-weight: bold; border-radius: 6px; border: 1px solid #ccc; background: #fff; }
+        .mode-row button.active { background: #007aff; color: #fff; border-color: #007aff; }
         .data-btn { flex: 1; height: 32px; font-size: 10px; font-weight: bold; border-radius: 6px; border: none; color: white; }
         .btn-out { background: #5856d6; } .btn-clr { background: #ff3b30; }
         .save-btn { height: 36px; font-size: 13px; background: #34c759; border: none; border-radius: 6px; color: white; font-weight: bold; }
@@ -139,10 +139,12 @@ function applyData(code) {
 function resize() { const nw = cvs.parentElement.clientWidth, nh = cvs.parentElement.clientHeight; if(cvs.width>0){ cam.x+=(nw-cvs.width)/2; cam.y+=(nh-cvs.height)/2; } cvs.width=nw; cvs.height=nh; render(); }
 const toS = (gx, gy) => ({ x: (gx - gy) * (T_W/2), y: (gx + gy) * (T_H/2) });
 const toG = (sx, sy) => { let x = (sx - cam.x)/cam.z, y = (sy - cam.y)/cam.z; let gy = (y/(T_H/2) - x/(T_W/2))/2; return { x: x/(T_W/2) + gy, y: gy }; };
+
 function isBlocked(gx, gy, gw, gh, ignoreId = null) {
     for (let x = gx; x < gx + gw; x++) for (let y = gy; y < gy + gh; y++) if (map.some(d => d.id !== ignoreId && x >= Math.round(d.x) && x < Math.round(d.x) + assets[d.aIdx].gw && y >= Math.round(d.y) && y < Math.round(d.y) + assets[d.aIdx].gh)) return true;
     return false;
 }
+
 function render() {
     ctx.clearRect(0,0,cvs.width,cvs.height); ctx.save(); ctx.translate(cam.x, cam.y); ctx.scale(cam.z, cam.z);
     ctx.strokeStyle = "rgba(0,0,0,0.08)"; ctx.lineWidth = 1/cam.z;
@@ -154,55 +156,59 @@ function render() {
         const a = assets[d.aIdx]; if(!a) return; const w = T_W * d.s, h = (a.img.height/a.img.width) * w, anchor = toS(d.x + a.gw + d.ox, d.y + a.gh + d.oy); 
         ctx.drawImage(a.img, anchor.x - w / 2, anchor.y - h + d.off, w, h);
         
-        // 【修正】新しく設置するモード（activeAsset!=-1）のときはマップ上の枠を出さないように
-        if(activeAsset === -1 && selIdx === i && (!lockedId || lockedId === d.id)) { 
-            ctx.strokeStyle = "#007aff"; ctx.lineWidth = (lockedId ? 1 : 3)/cam.z; const gx = Math.round(d.x), gy = Math.round(d.y), pS = toS(gx+a.gw, gy+a.gh), pW = toS(gx, gy+a.gh), pE = toS(gx+a.gw, gy), pN = toS(gx, gy); ctx.beginPath(); ctx.moveTo(pS.x,pS.y); ctx.lineTo(pW.x,pW.y); ctx.lineTo(pN.x,pN.y); ctx.lineTo(pE.x,pE.y); ctx.closePath(); ctx.stroke(); 
+        // --- 枠描画（ikumiさん好みのキビキビ枠） ---
+        if(selIdx === i && (!lockedId || lockedId === d.id)) {
+            ctx.strokeStyle = "#007aff"; 
+            ctx.lineWidth = (lockedId ? 1 : 3)/cam.z; // 動かしている時は1px、離すと3px
+            const gx = Math.round(d.x), gy = Math.round(d.y), 
+                  pS = toS(gx+a.gw, gy+a.gh), pW = toS(gx, gy+a.gh), 
+                  pE = toS(gx+a.gw, gy), pN = toS(gx, gy); 
+            ctx.beginPath(); ctx.moveTo(pS.x,pS.y); ctx.lineTo(pW.x,pW.y); 
+            ctx.lineTo(pN.x,pN.y); ctx.lineTo(pE.x,pE.y); ctx.closePath(); ctx.stroke(); 
         }
     });
     ctx.restore();
 }
+
 function handleStart(x, y) {
     const rawG = toG(x, y), gx_o = Math.floor(rawG.x), gy_o = Math.floor(rawG.y), gx_p = Math.round(rawG.x), gy_p = Math.round(rawG.y);
     if(mode === 'pen') { penStart = {x:gx_p, y:gy_p}; penCurrent = {x:gx_p, y:gy_p}; render(); return; }
     if(mode === 'p-erase') { lines = lines.filter(l => Math.hypot((l.x1+l.x2)/2-rawG.x,(l.y1+l.y2)/2-rawG.y)>0.5); save(); render(); return; }
     
     let hitIdx = map.findLastIndex(d => { const a = assets[d.aIdx]; return rawG.x >= d.x && rawG.x < d.x + a.gw && rawG.y >= d.y && rawG.y < d.y + a.gh; });
-    
     if(mode === 'erase' && hitIdx !== -1) { map.splice(hitIdx, 1); selIdx = -1; save(); render(); return; }
+    
     if(mode === 'move') {
-        // もし上のリストで何か選んでいたら（設置モードなら）、そちらを優先
+        // 新規設置モード
         if(activeAsset !== -1) { 
             const a = assets[activeAsset], nx = gx_o - (a.gw-1), ny = gy_o - (a.gh-1); 
             if(!isBlocked(nx, ny, a.gw, a.gh)) { 
                 const n = {id: Date.now(), x: nx, y: ny, aIdx: activeAsset, s: a.defS, off: a.defO, ox: a.ox, oy: a.oy}; 
-                map.push(n); selIdx = map.length - 1; lockedId = n.id; save(); render(); return; 
+                map.push(n); 
+                selIdx = map.length - 1; // 設置した瞬間に対象をセレクト！
+                lockedId = n.id; 
+                updatePanel(); save(); render(); return; 
             } 
         }
-        // 何も設置するものが選ばれていない時だけ、マップ上の建物を選択できる
+        // 既存の建物選択
         if(hitIdx !== -1) { selIdx = hitIdx; lockedId = map[selIdx].id; updatePanel(); render(); return; }
         
         selIdx = -1; lockedId = null; drag = true; render();
     }
 }
+
 function handleMove(x, y, dx, dy) {
     const rawG = toG(x, y); if(mode === 'pen' && penStart) { penCurrent = {x: Math.round(rawG.x), y: Math.round(rawG.y)}; render(); return; }
     if(lockedId) { const dIdx = map.findIndex(d => d.id === lockedId); if(dIdx !== -1) { const d = map[dIdx]; const a = assets[d.aIdx], nx = Math.floor(rawG.x) - (a.gw-1), ny = Math.floor(rawG.y) - (a.gh-1); if(!isBlocked(nx, ny, a.gw, a.gh, d.id)) { d.x = nx; d.y = ny; selIdx = dIdx; save(); } } }
     else if(drag) { cam.x += dx; cam.y += dy; }
     render();
 }
+
 function handleEnd() { if(mode === 'pen' && penStart && penCurrent && (penStart.x !== penCurrent.x || penStart.y !== penCurrent.y)) { lines.push({x1:penStart.x, y1:penStart.y, x2:penCurrent.x, y2:penCurrent.y}); save(); } drag = pinch = false; lockedId = null; penStart = null; penCurrent = null; render(); }
+
 function toggleAssetModal(show) { document.getElementById('asset-overlay').style.display = show ? 'flex' : 'none'; }
 function updateCurBox() { const box = document.getElementById('cur-box'); if(activeAsset !== -1) { box.style.backgroundImage = `url(${assets[activeAsset].src})`; box.textContent = ''; } else { box.style.backgroundImage = 'none'; box.textContent = '未選択'; } }
-function addThumb(idx) { 
-    const d = document.createElement('div'); d.className = 'thumb'; d.style.backgroundImage = `url(${assets[idx].src})`; 
-    d.onclick = () => { 
-        activeAsset = idx; 
-        // 【修正】上のリストで選んだ瞬間に、マップ上の選択を解除！
-        selIdx = -1; lockedId = null; 
-        setMode('move'); updateCurBox(); toggleAssetModal(false); render(); 
-    }; 
-    document.getElementById('asset-grid').appendChild(d); 
-}
+function addThumb(idx) { const d = document.createElement('div'); d.className = 'thumb'; d.style.backgroundImage = `url(${assets[idx].src})`; d.onclick = () => { activeAsset = idx; selIdx = -1; lockedId = null; setMode('move'); updateCurBox(); toggleAssetModal(false); render(); }; document.getElementById('asset-grid').appendChild(d); }
 function deselect() { activeAsset = -1; selIdx = -1; lockedId = null; updateCurBox(); render(); }
 async function loadPresets() { for (const p of PRESETS) { await new Promise(res => { const img = new Image(); img.crossOrigin = "anonymous"; img.onload = () => { const src = crop(img), i2 = new Image(); i2.onload = () => { assets.push({ img: i2, src, name: p.name, defS: p.s, defO: p.o, gw: p.gw, gh: p.gh, ox: p.ox, oy: p.oy }); addThumb(assets.length - 1); res(); }; i2.src = src; }; img.src = p.url; }); } }
 function handleFiles(files) { for (const f of files) { const reader = new FileReader(); reader.onload = e => { const img = new Image(); img.onload = () => { const src = crop(img), i2 = new Image(); i2.onload = () => { assets.push({ img: i2, src, name: null, defS: 1, defO: 0, gw: 1, gh: 1, ox: 0, oy: 0 }); addThumb(assets.length - 1); }; i2.src = src; }; img.src = e.target.result; }; reader.readAsDataURL(f); } }
