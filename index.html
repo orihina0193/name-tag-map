@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.16 Perfect-Line</title>
+    <title>避難所レイアウト v29.1.17 Continuous-Build</title>
     <style>
         :root { --panel-h: 240px; --panel-w: 200px; }
         body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; display: flex; flex-direction: column; }
@@ -103,16 +103,12 @@ function render() {
         let s = toS(i,-20), e = toS(i,40); ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(e.x,e.y); ctx.stroke(); 
         s = toS(-20,i); e = toS(40,i); ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(e.x,e.y); ctx.stroke(); 
     }
-    // 線を描画
     ctx.strokeStyle = "rgba(255,0,0,0.6)"; ctx.lineWidth = 4/cam.z;
     lines.forEach(l => { const s = toS(l.x1, l.y1), e = toS(l.x2, l.y2); ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke(); });
-    
-    // ラバーバンドプレビュー復活
     if(mode === 'pen' && penStart && penCurrent) {
         ctx.beginPath(); ctx.strokeStyle = "rgba(255, 0, 0, 0.4)"; ctx.setLineDash([5/cam.z, 5/cam.z]);
         const s = toS(penStart.x, penStart.y), e = toS(penCurrent.x, penCurrent.y);
         ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke(); ctx.setLineDash([]);
-        ctx.fillStyle = "rgba(255, 0, 0, 0.8)"; ctx.beginPath(); ctx.arc(s.x, s.y, 5/cam.z, 0, Math.PI*2); ctx.fill();
     }
     map.sort((a,b)=>(Math.round(a.x)+Math.round(a.y))-(Math.round(b.x)+Math.round(b.y))).forEach((d, i) => {
         const a = assets[d.aIdx]; if(!a) return;
@@ -134,11 +130,18 @@ function handleStart(x, y) {
     let hitIdx = map.findLastIndex(d => { const a = assets[d.aIdx]; return rawG.x >= d.x && rawG.x < d.x + a.gw && rawG.y >= d.y && rawG.y < d.y + a.gh; });
     if(mode === 'erase' && hitIdx !== -1) { map.splice(hitIdx, 1); selIdx = -1; save(); render(); return; }
     if(mode === 'move') {
-        if(hitIdx !== -1) { selIdx = hitIdx; lockedId = map[selIdx].id; activeAsset = -1; document.querySelectorAll('.thumb').forEach(t => t.classList.remove('selected')); document.getElementById('size-s').value = map[selIdx].s; document.getElementById('off-s').value = map[selIdx].off; }
-        else if(activeAsset !== -1) { 
+        if(activeAsset !== -1) { 
+            // 建物選択中なら、既存建物のヒットに関わらず新規設置を優先
             const a = assets[activeAsset], nx = gx_o - (a.gw-1), ny = gy_o - (a.gh-1);
-            const n = {id: Date.now(), x: nx, y: ny, aIdx: activeAsset, s: a.defS, off: a.defO, ox: a.ox, oy: a.oy}; map.push(n); selIdx = map.length - 1; lockedId = n.id; save();
-        } else { selIdx = -1; lockedId = null; drag = true; }
+            const n = {id: Date.now(), x: nx, y: ny, aIdx: activeAsset, s: a.defS, off: a.defO, ox: a.ox, oy: a.oy}; 
+            map.push(n); selIdx = map.length - 1; lockedId = n.id; save();
+        } else if(hitIdx !== -1) { 
+            // 何も選択していない状態で建物を触ったら移動モード
+            selIdx = hitIdx; lockedId = map[selIdx].id; 
+            document.getElementById('size-s').value = map[selIdx].s; document.getElementById('off-s').value = map[selIdx].off; 
+        } else { 
+            selIdx = -1; lockedId = null; drag = true; 
+        }
         render();
     }
 }
@@ -157,8 +160,7 @@ function handleEnd() {
     drag = pinch = false; lockedId = null; penStart = null; penCurrent = null; render(); 
 }
 function eraseAt(gx, gy) {
-    const threshold = 0.5;
-    const oldLen = lines.length;
+    const threshold = 0.5; const oldLen = lines.length;
     lines = lines.filter(l => {
         const dx = l.x2 - l.x1, dy = l.y2 - l.y1, lenSq = dx*dx + dy*dy;
         if(lenSq === 0) return Math.hypot(l.x1 - gx, l.y1 - gy) > threshold;
