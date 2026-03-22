@@ -3,25 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.35</title>
+    <title>避難所レイアウト v29.1.36</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
-        :root { --panel-h: 240px; --panel-w: 220px; }
+        :root { --panel-h: 250px; --panel-w: 220px; }
         body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; display: flex; flex-direction: column; }
         #main-container { flex: 1; position: relative; overflow: hidden; }
         canvas { display: block; background: #f0f0f0; width: 100%; height: 100%; }
-        #top-panel { position: absolute; top: 0; width: 100%; height: 65px; background: rgba(255,255,255,0.9); border-bottom: 1px solid #ccc; display: flex; align-items: center; padding: 0 10px; box-sizing: border-box; z-index: 100; gap: 10px; }
+        
+        /* 上部パネル */
+        #top-panel { position: absolute; top: 0; width: 100%; height: 65px; background: rgba(255,255,255,0.9); border-bottom: 1px solid #ccc; display: flex; align-items: center; padding: 0 10px; box-sizing: border-box; z-index: 100; gap: 8px; }
         #cur-box { width: 50px; height: 50px; border: 2px solid #007aff; border-radius: 8px; background: #fff; background-size: contain; background-repeat: no-repeat; background-position: center; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #007aff; font-weight: bold; text-align: center; }
         #open-list-btn { width: 50px; height: 50px; border-radius: 8px; border: 1px solid #ccc; background: #fff; font-size: 24px; color: #666; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .deselect-btn { height: 50px; padding: 0 10px; border-radius: 8px; border: 1px solid #ccc; background: #eee; color: #666; font-size: 11px; font-weight: bold; flex-shrink: 0; }
+        .deselect-btn { height: 50px; padding: 0 8px; border-radius: 8px; border: 1px solid #ccc; background: #eee; color: #666; font-size: 11px; font-weight: bold; flex-shrink: 0; }
         
+        /* ブラウザ更新ボタン（右上に配置） */
+        .reload-btn { height: 50px; width: 50px; margin-left: auto; border-radius: 8px; border: 1px solid #ff9500; background: #fff; color: #ff9500; font-size: 20px; font-weight: bold; flex-shrink: 0; }
+
+        /* 下部パネル */
         #bot-panel { background: rgba(255,255,255,0.98); border-top: 1px solid #ccc; padding: 8px 10px; box-sizing: border-box; z-index: 100; display: flex; flex-direction: column; gap: 6px; height: var(--panel-h); }
         
-        /* 横画面（Landscape）用のレイアウト調整 */
         @media (orientation: landscape) { 
             body { flex-direction: row; } 
-            #bot-panel { width: var(--panel-w); height: 100%; border-top: none; border-left: 1px solid #ccc; padding: 10px 8px; overflow-y: auto; flex-shrink: 0; gap: 10px; } 
-            .tool-section { flex-direction: column; gap: 12px; align-items: center; }
+            #bot-panel { width: var(--panel-w); height: 100%; border-top: none; border-left: 1px solid #ccc; padding: 10px 8px; overflow-y: auto; flex-shrink: 0; gap: 8px; } 
+            .tool-section { flex-direction: column; gap: 10px; align-items: center; }
         }
         
         .row { display: flex; align-items: center; gap: 8px; }
@@ -31,23 +36,23 @@
         
         .tool-section { display: flex; justify-content: space-between; gap: 8px; }
         
-        /* 十字キー：ゲームパッド風配置 */
+        /* 十字キー */
         #nudge-grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); gap: 4px; width: 110px; flex-shrink: 0; }
         #nudge-grid button { height: 40px; font-size: 20px; border: 1px solid #ccc; background: #fff; border-radius: 6px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 0 #ddd; }
-        #nudge-grid button:active { transform: translateY(1px); box-shadow: none; }
         .btn-up { grid-column: 2; grid-row: 1; }
         .btn-left { grid-column: 1; grid-row: 2; }
         .btn-down { grid-column: 2; grid-row: 2; }
         .btn-right { grid-column: 3; grid-row: 2; }
 
+        /* モード・データ操作 */
         .mode-box { flex: 1; display: flex; flex-direction: column; gap: 4px; width: 100%; }
         .mode-row { display: flex; gap: 3px; flex-wrap: wrap; }
         .mode-row button { flex: 1; min-width: 44px; height: 32px; font-size: 10px; font-weight: bold; border-radius: 6px; border: 1px solid #ccc; background: #fff; }
         .mode-row button.active { background: #007aff; color: #fff; border-color: #007aff; }
         .data-btn { flex: 1; height: 32px; font-size: 10px; font-weight: bold; border-radius: 6px; border: none; color: white; }
-        .btn-out { background: #5856d6; } /* 共有・更新 */
-        .btn-clr { background: #ff3b30; } /* 消去 */
-        .save-btn { height: 36px; font-size: 12px; background: #34c759; border: none; border-radius: 6px; color: white; font-weight: bold; margin-bottom: 2px; }
+        .btn-out { background: #5856d6; } /* 共有URL */
+        .btn-clr { background: #ff3b30; } /* 全消去 */
+        .save-btn { height: 36px; font-size: 12px; background: #34c759; border: none; border-radius: 6px; color: white; font-weight: bold; }
 
         #asset-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; display: none; align-items: center; justify-content: center; }
         #asset-modal { width: 90%; max-height: 80%; background: #f0f0f0; border-radius: 12px; padding: 15px; display: flex; flex-direction: column; gap: 15px; }
@@ -64,6 +69,7 @@
         <div id="cur-box">未選択</div>
         <button id="open-list-btn" onclick="toggleAssetModal(true)">＋</button>
         <button class="deselect-btn" onclick="deselect()">選択<br>解除</button>
+        <button class="reload-btn" onclick="location.reload()">🔄</button>
     </div>
 </div>
 
@@ -88,8 +94,8 @@
         <div class="mode-box">
             <button class="save-btn" onclick="exportImage()">画像として保存</button>
             <div style="display:flex; gap:3px;">
-                <button class="data-btn btn-out" onclick="exportURL()">🔄 更新/共有</button>
-                <button class="data-btn btn-clr" onclick="clearAll()">消去</button>
+                <button class="data-btn btn-out" onclick="exportURL()">共有URL</button>
+                <button class="data-btn btn-clr" onclick="clearAll()">全消去</button>
             </div>
             <div class="mode-row"><button id="m-move" onclick="setMode('move')">移動</button><button id="m-pen" onclick="setMode('pen')">ペン</button><button id="m-p-erase" onclick="setMode('p-erase')">線消</button><button id="m-erase" onclick="setMode('erase')">建物消</button></div>
         </div>
@@ -98,6 +104,7 @@
 <div id="export-overlay" onclick="this.style.display='none'"><img id="export-img" src=""></div>
 
 <script>
+/* ロジック部分は変更なし（保存・読み込み・描画など） */
 const PRESETS = [
     { name: "HQ", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/HQ.png", s: 1.6, o: 1, gw: 2, gh: 2, ox: -0.1, oy: -0.2 },
     { name: "DOOM", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/DOOM.png", s: 1.6, o: -3, gw: 2, gh: 2, ox: -0.2, oy: 0 },
@@ -131,7 +138,12 @@ async function exportURL() {
 
 function applyData(code) { try { const json = LZString.decompressFromEncodedURIComponent(code); const d = JSON.parse(json); lines = d.l || []; map = d.m.map(item => { let aIdx = assets.findIndex(a => a.name === item.n); if(aIdx === -1 && item.src) { const img = new Image(); img.src = item.src; assets.push({ img, src: item.src, name: null, defS: 1, defO: 0, gw: 1, gh: 1, ox: 0, oy: 0 }); addThumb(assets.length - 1); aIdx = assets.length - 1; } return { id: Date.now()+Math.random(), x: item.x, y: item.y, aIdx: aIdx===-1?0:aIdx, s: item.s, off: item.off, ox: item.ox, oy: item.oy }; }); save(); render(); } catch(e) { console.error(e); } }
 
-function resize() { const nw = cvs.parentElement.clientWidth, nh = cvs.parentElement.clientHeight; if(cvs.width>0){ cam.x+=(nw-cvs.width)/2; cam.y+=(nh-cvs.height)/2; } cvs.width=nw; cvs.height=nh; render(); }
+function resize() { 
+    const nw = cvs.parentElement.clientWidth, nh = cvs.parentElement.clientHeight;
+    if(cvs.width > 0) { cam.x += (nw - cvs.width) / 2; cam.y += (nh - cvs.height) / 2; }
+    cvs.width = nw; cvs.height = nh; render(); 
+}
+
 const toS = (gx, gy) => ({ x: (gx - gy) * (T_W/2), y: (gx + gy) * (T_H/2) });
 const toG = (sx, sy) => { let x = (sx - cam.x)/cam.z, y = (sy - cam.y)/cam.z; let gy = (y/(T_H/2) - x/(T_W/2))/2; return { x: x/(T_W/2) + gy, y: gy }; };
 
@@ -198,7 +210,7 @@ function adjO(v) { if(selIdx!==-1){ map[selIdx].off+=v; updatePanel(); save(); r
 function nudge(dx,dy) { if(selIdx!==-1){ map[selIdx].ox=parseFloat((map[selIdx].ox+dx).toFixed(2)); map[selIdx].oy=parseFloat((map[selIdx].oy+dy).toFixed(2)); save(); render(); } }
 function clearAll() { if(confirm("配置をすべて消去しますか？")){ map=[]; lines=[]; selIdx=-1; lockedId=null; save(); render(); } }
 function exportImage() { deselect(); render(); document.getElementById('export-img').src = cvs.toDataURL(); document.getElementById('export-overlay').style.display='flex'; }
-function crop(img) { const c = document.createElement('canvas'), t = c.getContext('2d'); c.width = img.width; c.height = img.height; t.drawImage(img,0,0); const d = t.getImageData(0,0,c.width,c.height).data; let x1=c.width, y1=c.height, x2=0, y2=0; for(let y=0; y<c.height; y++) for(let x=0; x<c.width; x++) if(d[(y*c.width+x)*4+3]>10){ x1=Math.min(x1,x); y1=Math.min(y1,y); x2=Math.max(x2,x); y2=Math.max(y2,y); } const w = x2-x1+1, h = y2-y1+1, c2 = document.createElement('canvas'); c2.width = w; c2.height = h; c2.getContext('2d').drawImage(img,x1,y1,w,h,0,0,w,h); return c2.toDataURL(); }
+function crop(img) { const c = document.createElement('canvas'), t = c.getContext('2d'); c.width = img.width; c.height = img.height; t.drawImage(img,0,0); const d = t.getImageData(0,0,c.width,c.height).data; let x1=c.width, y1=c.height, x2=0, y2=0; for(let y=0; y<c.height; y++) for(let x=0; x<c.width; x++) if(d[(y*c.width+x)*4+3]>10){ x1=Math.min(x1,x); y1=Math.min(y1,y); x2=Math.max(x2,x); y2=Math.max(y2,y); } const w = x2-x1+1, h = y2-y1+1, c2 = document.createElement('canvas'); c2.width = w; c2.height = h; c2.getContext('2d').drawImage(img,x1,y1,w,h,0,0,w,h); return c2.toVtaURL(); }
 init();
 document.getElementById('size-s').addEventListener('input', (e) => { if(selIdx!==-1){ map[selIdx].s = parseFloat(e.target.value); render(); } });
 document.getElementById('off-s').addEventListener('input', (e) => { if(selIdx!==-1){ map[selIdx].off = parseInt(e.target.value); render(); } });
