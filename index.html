@@ -3,19 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.25</title>
+    <title>避難所レイアウト v29.1.27</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
         :root { --panel-h: 240px; --panel-w: 200px; }
         body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; display: flex; flex-direction: column; }
         #main-container { flex: 1; position: relative; overflow: hidden; }
         canvas { display: block; background: #f0f0f0; width: 100%; height: 100%; }
-        
         #top-panel { position: absolute; top: 0; width: 100%; height: 65px; background: rgba(255,255,255,0.9); border-bottom: 1px solid #ccc; display: flex; align-items: center; padding: 0 10px; box-sizing: border-box; z-index: 100; gap: 10px; }
         #cur-box { width: 50px; height: 50px; border: 2px solid #007aff; border-radius: 8px; background: #fff; background-size: contain; background-repeat: no-repeat; background-position: center; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #007aff; font-weight: bold; text-align: center; }
         #open-list-btn { width: 50px; height: 50px; border-radius: 8px; border: 1px solid #ccc; background: #fff; font-size: 24px; color: #666; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .deselect-btn { height: 50px; padding: 0 10px; border-radius: 8px; border: 1px solid #ccc; background: #eee; color: #666; font-size: 11px; font-weight: bold; flex-shrink: 0; }
-
         #asset-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; display: none; align-items: center; justify-content: center; }
         #asset-modal { width: 90%; max-height: 80%; background: #f0f0f0; border-radius: 12px; padding: 15px; display: flex; flex-direction: column; gap: 15px; }
         #asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 10px; overflow-y: auto; padding: 5px; }
@@ -24,14 +22,8 @@
         .close-modal { font-size: 20px; color: #666; padding: 5px; }
         .thumb { width: 60px; height: 60px; border-radius: 8px; border: 2px solid #ccc; background-size: contain; background-repeat: no-repeat; background-position: center; background-color: #fff; margin: 0 auto; }
         #modal-upload-label { width: 60px; height: 60px; border: 2px dashed #bbb; border-radius: 8px; display: flex; justify-content: center; align-items: center; font-size: 24px; color: #999; background: #fff; margin: 0 auto; }
-
         #bot-panel { background: rgba(255,255,255,0.98); border-top: 1px solid #ccc; padding: 8px 10px; box-sizing: border-box; z-index: 100; display: flex; flex-direction: column; gap: 6px; height: var(--panel-h); }
-        @media (orientation: landscape) {
-            body { flex-direction: row; }
-            #bot-panel { width: var(--panel-w); height: 100%; border-top: none; border-left: 1px solid #ccc; padding: 10px 8px; overflow-y: auto; flex-shrink: 0; }
-            .tool-section { flex-direction: column; gap: 8px; }
-            #nudge-grid { display: grid; grid-template-columns: repeat(3, 1fr); width: 100%; gap: 3px; }
-        }
+        @media (orientation: landscape) { body { flex-direction: row; } #bot-panel { width: var(--panel-w); height: 100%; border-top: none; border-left: 1px solid #ccc; padding: 10px 8px; overflow-y: auto; flex-shrink: 0; } .tool-section { flex-direction: column; gap: 8px; } #nudge-grid { display: grid; grid-template-columns: repeat(3, 1fr); width: 100%; gap: 3px; } }
         .row { display: flex; align-items: center; gap: 8px; }
         .row label { font-size: 11px; font-weight: bold; width: 35px; }
         input[type="range"] { flex: 1; height: 32px; }
@@ -43,7 +35,7 @@
         .mode-row button { flex: 1; min-width: 44px; height: 32px; font-size: 10px; font-weight: bold; border-radius: 6px; border: 1px solid #ccc; }
         .mode-row button.active { background: #007aff; color: #fff; }
         .data-btn { flex: 1; height: 32px; font-size: 10px; font-weight: bold; border-radius: 6px; border: none; color: white; }
-        .btn-out { background: #5856d6; } .btn-in { background: #ff9500; } .btn-clr { background: #ff3b30; }
+        .btn-out { background: #5856d6; } .btn-clr { background: #ff3b30; }
         .save-btn { height: 36px; font-size: 13px; background: #34c759; border: none; border-radius: 6px; color: white; font-weight: bold; }
         #export-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; display: none; flex-direction: column; align-items: center; justify-content: center; }
         #export-img { max-width: 90%; max-height: 75%; border: 2px solid #fff; }
@@ -77,7 +69,6 @@
             <button class="save-btn" onclick="exportImage()">画像として保存</button>
             <div style="display:flex; gap:3px;">
                 <button class="data-btn btn-out" onclick="exportURL()">共有URL</button>
-                <button class="data-btn btn-in" onclick="importData()">読込</button>
                 <button class="data-btn btn-clr" onclick="clearAll()">消去</button>
             </div>
             <div class="mode-row"><button id="m-move" onclick="setMode('move')">移動</button><button id="m-pen" onclick="setMode('pen')">ペン</button><button id="m-p-erase" onclick="setMode('p-erase')">ペン消し</button><button id="m-erase" onclick="setMode('erase')">消去</button></div>
@@ -103,21 +94,8 @@ const T_W = 64, T_H = 32;
 let cam = { x: 0, y: 0, z: 1 }, assets = [], map = [], lines = [], selIdx = -1, activeAsset = -1, mode = 'move';
 let drag = false, pinch = false, lockedId = null, penStart = null, penCurrent = null, lastT = {x: 0, y: 0}, lastDist = 0;
 
-function init() {
-    window.addEventListener('resize', resize); resize();
-    cam.x = cvs.width/2; cam.y = cvs.height/3;
-    loadPresets().then(() => {
-        // 起動時にURLパラメータを確認
-        const params = new URLSearchParams(window.location.search);
-        const urlData = params.get('d');
-        if (urlData) applyData(urlData);
-        else load();
-        render();
-    });
-    setupEvents();
-}
+function init() { window.addEventListener('resize', resize); resize(); cam.x = cvs.width/2; cam.y = cvs.height/3; loadPresets().then(() => { const params = new URLSearchParams(window.location.search); const urlData = params.get('d'); if (urlData) applyData(urlData); else load(); render(); }); setupEvents(); }
 
-// URL共有 & 短縮URL発行
 async function exportURL() {
     const exportMap = map.map(d => {
         const a = assets[d.aIdx];
@@ -128,20 +106,18 @@ async function exportURL() {
     const compressed = LZString.compressToEncodedURIComponent(JSON.stringify(obj));
     const baseUrl = window.location.href.split('?')[0];
     const fullUrl = baseUrl + "?d=" + compressed;
-
     try {
         const res = await fetch(`https://is.gd/create.php?format=json&url=${encodeURIComponent(fullUrl)}`);
         const data = await res.json();
         const finalUrl = data.shorturl || fullUrl;
         await navigator.clipboard.writeText(finalUrl);
-        alert("【共有URLをコピーしました！】\n" + finalUrl + "\n\nLINEに貼り付けて送れば、相手がクリックするだけでこの配置が開きます！");
+        alert("【共有URLをコピーしました！】\n" + finalUrl + "\n\nLINEに送ればタップで開けます。");
     } catch (err) {
         await navigator.clipboard.writeText(fullUrl);
-        alert("【URLをコピーしました！】\n(短縮に失敗しましたが、このままLINEに貼れます)");
+        alert("【URLをコピーしました！】");
     }
 }
 
-// データ解析・適用
 function applyData(code) {
     try {
         const json = LZString.decompressFromEncodedURIComponent(code);
@@ -160,18 +136,6 @@ function applyData(code) {
     } catch(e) { console.error("Restore error", e); }
 }
 
-function importData() {
-    let input = prompt("共有URL、または暗号コードを貼り付けてください");
-    if(!input) return;
-    let code = input;
-    if (input.includes("?d=")) {
-        const parts = input.split("?d=");
-        code = parts[1] ? parts[1].split("&")[0] : input;
-    }
-    applyData(code);
-}
-
-// 以下、基本ロジック
 function resize() { const nw = cvs.parentElement.clientWidth, nh = cvs.parentElement.clientHeight; if(cvs.width>0){ cam.x+=(nw-cvs.width)/2; cam.y+=(nh-cvs.height)/2; } cvs.width=nw; cvs.height=nh; render(); }
 const toS = (gx, gy) => ({ x: (gx - gy) * (T_W/2), y: (gx + gy) * (T_H/2) });
 const toG = (sx, sy) => { let x = (sx - cam.x)/cam.z, y = (sy - cam.y)/cam.z; let gy = (y/(T_H/2) - x/(T_W/2))/2; return { x: x/(T_W/2) + gy, y: gy }; };
@@ -194,7 +158,8 @@ function render() {
         const a = assets[d.aIdx]; if(!a) return;
         const w = T_W * d.s, h = (a.img.height/a.img.width) * w, anchor = toS(d.x + a.gw + d.ox, d.y + a.gh + d.oy); 
         ctx.drawImage(a.img, anchor.x - w / 2, anchor.y - h + d.off, w, h);
-        if(selIdx === i && (!lockedId || lockedId === d.id)) { ctx.strokeStyle = "#007aff"; ctx.lineWidth = 3/cam.z; const gx = Math.round(d.x), gy = Math.round(d.y), pS = toS(gx+a.gw, gy+a.gh), pW = toS(gx, gy+a.gh), pE = toS(gx+a.gw, gy), pN = toS(gx, gy); ctx.beginPath(); ctx.moveTo(pS.x,pS.y); ctx.lineTo(pW.x,pW.y); ctx.lineTo(pN.x,pN.y); ctx.lineTo(pE.x,pE.y); ctx.closePath(); ctx.stroke(); }
+        // 【枠修正】選択中なら常に最新の位置に枠を描画
+        if(selIdx === i || (lockedId && d.id === lockedId)) { ctx.strokeStyle = "#007aff"; ctx.lineWidth = 3/cam.z; const gx = Math.round(d.x), gy = Math.round(d.y), pS = toS(gx+a.gw, gy+a.gh), pW = toS(gx, gy+a.gh), pE = toS(gx+a.gw, gy), pN = toS(gx, gy); ctx.beginPath(); ctx.moveTo(pS.x,pS.y); ctx.lineTo(pW.x,pW.y); ctx.lineTo(pN.x,pN.y); ctx.lineTo(pE.x,pE.y); ctx.closePath(); ctx.stroke(); }
     });
     ctx.restore();
 }
@@ -215,7 +180,13 @@ function handleStart(x, y) {
 }
 function handleMove(x, y, dx, dy) {
     const rawG = toG(x, y); if(mode === 'pen' && penStart) { penCurrent = {x: Math.round(rawG.x), y: Math.round(rawG.y)}; render(); return; }
-    if(lockedId) { const d = map.find(d => d.id === lockedId); if(d) { const a = assets[d.aIdx], nx = Math.floor(rawG.x) - (a.gw-1), ny = Math.floor(rawG.y) - (a.gh-1); if(!isBlocked(nx, ny, a.gw, a.gh, d.id)) { d.x = nx; d.y = ny; save(); } } }
+    if(lockedId) { 
+        const dIdx = map.findIndex(d => d.id === lockedId); 
+        if(dIdx !== -1) { 
+            const d = map[dIdx]; const a = assets[d.aIdx], nx = Math.floor(rawG.x) - (a.gw-1), ny = Math.floor(rawG.y) - (a.gh-1); 
+            if(!isBlocked(nx, ny, a.gw, a.gh, d.id)) { d.x = nx; d.y = ny; selIdx = dIdx; save(); } 
+        } 
+    }
     else if(drag) { cam.x += dx; cam.y += dy; }
     render();
 }
