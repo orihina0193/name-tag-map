@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.43</title>
+    <title>避難所レイアウト v29.1.72</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
         :root { --panel-h: 250px; --panel-w: 220px; }
@@ -20,38 +20,68 @@
         #bot-panel { background: rgba(255,255,255,0.98); border-top: 1px solid #ccc; padding: 8px 10px; box-sizing: border-box; z-index: 100; display: flex; flex-direction: column; gap: 6px; height: var(--panel-h); }
         
         @media (orientation: landscape) { 
+            :root { --panel-w: 220px; } 
             body { flex-direction: row; } 
-            #bot-panel { width: var(--panel-w); height: 100%; border-top: none; border-left: 1px solid #ccc; padding: 10px 8px; overflow-y: auto; flex-shrink: 0; gap: 8px; } 
-            .tool-section { flex-direction: column; gap: 10px; align-items: center; }
+            #bot-panel { 
+                width: var(--panel-w); 
+                height: 100%; 
+                border-top: none; 
+                border-left: 1px solid #ccc; 
+                padding: 10px 5px; 
+                overflow-x: hidden; 
+                overflow-y: auto; 
+                flex-shrink: 0; 
+                gap: 8px; 
+            } 
+            .tool-section { flex-direction: column; gap: 6px; align-items: center; }
+            .row { width: 100%; gap: 4px; }
+            input[type="range"] { min-width: 0; flex: 1; }
         }
         
-        .row { display: flex; align-items: center; gap: 8px; }
-        .row label { font-size: 11px; font-weight: bold; width: 35px; }
-        input[type="range"] { flex: 1; height: 32px; cursor: pointer; }
-        .prec-btn { width: 34px; height: 32px; font-size: 16px; border: 1px solid #ccc; background: #fff; border-radius: 6px; cursor: pointer; }
+        .row { display: flex; align-items: center; gap: 5px; }
+        .row label { font-size: 10px; font-weight: bold; width: 12px; line-height: 1.1; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; }
+        input[type="range"] { flex: 1; height: 32px; cursor: pointer; margin: 0; }
         
-        .tool-section { display: flex; justify-content: space-between; gap: 8px; }
-        #nudge-grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); gap: 4px; width: 110px; flex-shrink: 0; }
-        #nudge-grid button { height: 40px; font-size: 20px; border: 1px solid #ccc; background: #fff; border-radius: 6px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 0 #ddd; cursor: pointer; }
+        /* 29.1.43 縦長ボタン再現 */
+        .prec-btn { 
+            width: 22px; 
+            height: 38px; 
+            font-size: 18px; 
+            border: 1px solid #dcdcdc; 
+            background: #fff; 
+            border-radius: 5px; 
+            color: #007aff; 
+            cursor: pointer; 
+            flex-shrink: 0; 
+            padding: 0; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        
+        .tool-section { display: flex; justify-content: space-between; gap: 5px; width: 100%; }
+        #nudge-grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); gap: 4px; width: 105px; flex-shrink: 0; }
+        #nudge-grid button { height: 36px; font-size: 18px; border: 1px solid #ccc; background: #fff; border-radius: 6px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 0 #ddd; cursor: pointer; color: #007aff; }
         .btn-up { grid-column: 2; grid-row: 1; }
         .btn-left { grid-column: 1; grid-row: 2; }
         .btn-down { grid-column: 2; grid-row: 2; }
         .btn-right { grid-column: 3; grid-row: 2; }
 
         .mode-box { flex: 1; display: flex; flex-direction: column; gap: 4px; width: 100%; }
-        .mode-row { display: flex; gap: 3px; flex-wrap: wrap; }
-        .mode-row button { flex: 1; min-width: 44px; height: 32px; font-size: 10px; font-weight: bold; border-radius: 6px; border: 1px solid #ccc; background: #fff; cursor: pointer; }
+        .mode-row { display: flex; gap: 2px; }
+        .mode-row button { flex: 1; min-width: 0; height: 30px; font-size: 9px; font-weight: bold; border-radius: 5px; border: 1px solid #ccc; background: #fff; cursor: pointer; color: #333; white-space: nowrap; padding: 0; }
         .mode-row button.active { background: #007aff; color: #fff; border-color: #007aff; }
-        .data-btn { flex: 1; height: 32px; font-size: 10px; font-weight: bold; border-radius: 6px; border: none; color: white; cursor: pointer; }
+        
+        .data-btn { flex: 1; height: 30px; font-size: 10px; font-weight: bold; border-radius: 5px; border: none; color: white; cursor: pointer; }
         .btn-out { background: #5856d6; }
         .btn-clr { background: #ff3b30; }
-        .save-btn { height: 36px; font-size: 12px; background: #34c759; border: none; border-radius: 6px; color: white; font-weight: bold; cursor: pointer; }
+        .save-btn { height: 34px; font-size: 11px; background: #34c759; border: none; border-radius: 6px; color: white; font-weight: bold; cursor: pointer; width: 100%; }
 
         #asset-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; display: none; align-items: center; justify-content: center; }
         #asset-modal { width: 90%; max-height: 80%; background: #f0f0f0; border-radius: 12px; padding: 15px; display: flex; flex-direction: column; gap: 15px; }
         #asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 10px; overflow-y: auto; padding: 5px; }
         .thumb { width: 60px; height: 60px; border-radius: 8px; border: 2px solid #ccc; background-size: contain; background-repeat: no-repeat; background-position: center; background-color: #fff; cursor: pointer; }
-        
         #export-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; display: none; flex-direction: column; align-items: center; justify-content: center; }
         #export-img { max-width: 90%; max-height: 75%; border: 2px solid #fff; }
     </style>
@@ -76,8 +106,8 @@
 </div>
 
 <div id="bot-panel">
-    <div class="row"><label>サイズ</label><button class="prec-btn" onclick="adjS(-0.05)">-</button><input type="range" id="size-s" min="0.1" max="5" step="0.05"><button class="prec-btn" onclick="adjS(0.05)">+</button></div>
-    <div class="row"><label>接地</label><button class="prec-btn" onclick="adjO(-1)">-</button><input type="range" id="off-s" min="-100" max="100" step="1"><button class="prec-btn" onclick="adjO(1)">+</button></div>
+    <div class="row"><label><span>サ</span><span>イ</span><span>ズ</span></label><button class="prec-btn" onclick="adjS(-0.05)">-</button><input type="range" id="size-s" min="0.1" max="5" step="0.05"><button class="prec-btn" onclick="adjS(0.05)">+</button></div>
+    <div class="row"><label><span>接</span><span>地</span></label><button class="prec-btn" onclick="adjO(-1)">-</button><input type="range" id="off-s" min="-100" max="100" step="1"><button class="prec-btn" onclick="adjO(1)">+</button></div>
     <div class="tool-section">
         <div id="nudge-grid">
             <button class="btn-up" onclick="nudge(0,-0.1)">↑</button>
@@ -95,7 +125,6 @@
         </div>
     </div>
 </div>
-<div id="export-overlay" onclick="this.style.display='none'"><img id="export-img" src=""></div>
 
 <script>
 const PRESETS = [
@@ -116,7 +145,6 @@ let drag = false, pinch = false, lockedId = null, penStart = null, penCurrent = 
 let tempAssetStore = -1;
 
 function init() { window.addEventListener('resize', resize); resize(); cam.x = cvs.width/2; cam.y = cvs.height/3; loadPresets().then(() => { const params = new URLSearchParams(window.location.search); const urlData = params.get('d'); if (urlData) applyData(urlData); else load(); render(); }); setupEvents(); }
-
 function toggleAssetModal(show) { document.getElementById('asset-overlay').style.display = show ? 'flex' : 'none'; }
 function addThumb(idx) { const d = document.createElement('div'); d.className = 'thumb'; d.style.backgroundImage = `url(${assets[idx].src})`; d.onclick = () => { activeAsset = idx; tempAssetStore = idx; selIdx = -1; lockedId = null; setMode('move'); updateCurBox(); toggleAssetModal(false); render(); }; document.getElementById('asset-grid').appendChild(d); }
 function updateCurBox() { const box = document.getElementById('cur-box'); if(activeAsset !== -1) { box.style.backgroundImage = `url(${assets[activeAsset].src})`; box.textContent = ''; } else { box.style.backgroundImage = 'none'; box.textContent = '未選択'; } }
@@ -177,20 +205,16 @@ function render() {
 function handleStart(x, y) {
     const rawG = toG(x, y), gx_o = Math.floor(rawG.x), gy_o = Math.floor(rawG.y), gx_p = Math.round(rawG.x), gy_p = Math.round(rawG.y);
     if(mode === 'pen') { penStart = {x:gx_p, y:gy_p}; penCurrent = {x:gx_p, y:gy_p}; render(); return; }
-    
-    // 線消し判定の強化
     if(mode === 'p-erase') {
         const distToSeg = (p, v, w) => {
             const l2 = Math.pow(v.x-w.x,2) + Math.pow(v.y-w.y,2);
             if(l2 === 0) return Math.hypot(p.x-v.x, p.y-v.y);
-            let t = ((p.x-v.x)*(w.x-v.x) + (p.y-v.y)*(w.y-v.y)) / l2;
-            t = Math.max(0, Math.min(1, t));
+            let t = Math.max(0, Math.min(1, ((p.x-v.x)*(w.x-v.x) + (p.y-v.y)*(w.y-v.y)) / l2));
             return Math.hypot(p.x-(v.x+t*(w.x-v.x)), p.y-(v.y+t*(w.y-v.y)));
         };
         lines = lines.filter(l => distToSeg(rawG, {x:l.x1, y:l.y1}, {x:l.x2, y:l.y2}) > 0.5);
         save(); render(); return;
     }
-    
     let hitIdx = map.findLastIndex(d => { const a = assets[d.aIdx]; return rawG.x >= d.x && rawG.x < d.x + a.gw && rawG.y >= d.y && rawG.y < d.y + a.gh; });
     if(mode === 'erase' && hitIdx !== -1) { map.splice(hitIdx, 1); selIdx = -1; save(); render(); return; }
     if(mode === 'move') {
@@ -235,8 +259,8 @@ function setupEvents() {
     cvs.addEventListener('mousedown', e => { lastT = {x: e.clientX, y: e.clientY}; handleStart(e.clientX, e.clientY); });
     window.addEventListener('mousemove', e => { if(drag || lockedId || (mode==='pen' && penStart)) { handleMove(e.clientX, e.clientY, e.clientX-lastT.x, e.clientY-lastT.y); lastT = {x: e.clientX, y: e.clientY}; } });
     window.addEventListener('mouseup', handleEnd);
-    cvs.addEventListener('wheel', e => { e.preventDefault(); const factor = e.deltaY > 0 ? 0.9 : 1.1; cam.z *= factor; render(); }, {passive: false});
-    cvs.addEventListener('touchstart', e => { if(e.touches.length >= 2) { pinch = true; drag = false; lastDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); return; } const t = e.touches[0]; lastT = {x: t.clientX, y: t.clientY}; handleStart(t.clientX, t.clientY); }, {passive: false});
+    cvs.addEventListener('wheel', e => { e.preventDefault(); cam.z *= (e.deltaY > 0 ? 0.9 : 1.1); render(); }, {passive: false});
+    cvs.addEventListener('touchstart', e => { if(e.touches.length >= 2) { pinch = true; lastDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); return; } const t = e.touches[0]; lastT = {x: t.clientX, y: t.clientY}; handleStart(t.clientX, t.clientY); }, {passive: false});
     cvs.addEventListener('touchmove', e => { e.preventDefault(); if(pinch && e.touches.length >= 2) { const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); cam.z *= (d / lastDist); lastDist = d; } else if(!pinch) { const t = e.touches[0]; handleMove(t.clientX, t.clientY, t.clientX-lastT.x, t.clientY-lastT.y); lastT = {x: t.clientX, y: t.clientY}; } render(); }, {passive: false});
     cvs.addEventListener('touchend', handleEnd);
 }
