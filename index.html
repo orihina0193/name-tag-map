@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.41</title>
+    <title>避難所レイアウト v29.1.42</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
         :root { --panel-h: 250px; --panel-w: 220px; }
@@ -113,7 +113,7 @@ const cvs = document.getElementById('cvs'); const ctx = cvs.getContext('2d');
 const T_W = 64, T_H = 32;
 let cam = { x: 0, y: 0, z: 1 }, assets = [], map = [], lines = [], selIdx = -1, activeAsset = -1, mode = 'move';
 let drag = false, pinch = false, lockedId = null, penStart = null, penCurrent = null, lastT = {x: 0, y: 0}, lastDist = 0;
-let tempAssetStore = -1; // 連続配置のための記憶用
+let tempAssetStore = -1;
 
 function init() { window.addEventListener('resize', resize); resize(); cam.x = cvs.width/2; cam.y = cvs.height/3; loadPresets().then(() => { const params = new URLSearchParams(window.location.search); const urlData = params.get('d'); if (urlData) applyData(urlData); else load(); render(); }); setupEvents(); }
 
@@ -146,15 +146,33 @@ function isBlocked(gx, gy, gw, gh, ignoreId = null) {
 
 function render() {
     ctx.clearRect(0,0,cvs.width,cvs.height); ctx.save(); ctx.translate(cam.x, cam.y); ctx.scale(cam.z, cam.z);
+    
+    // グリッド実線
+    ctx.setLineDash([]);
     ctx.strokeStyle = "rgba(0,0,0,0.08)"; ctx.lineWidth = 1/cam.z;
     for(let i=-20; i<=40; i++){ let s = toS(i,-20), e = toS(i,40); ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(e.x,e.y); ctx.stroke(); s = toS(-20,i); e = toS(40,i); ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(e.x,e.y); ctx.stroke(); }
+    
+    // 確定済みの赤い線
     lines.forEach(l => { ctx.beginPath(); ctx.strokeStyle = "rgba(255,0,0,0.6)"; ctx.lineWidth = 4/cam.z; const s = toS(l.x1, l.y1), e = toS(l.x2, l.y2); ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke(); });
-    if(mode === 'pen' && penStart && penCurrent) { ctx.beginPath(); ctx.strokeStyle = "rgba(255, 0, 0, 0.4)"; ctx.setLineDash([5/cam.z, 5/cam.z]); const s = toS(penStart.x, penStart.y), e = toS(penCurrent.x, penCurrent.y); ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke(); ctx.setLineDash([]); }
+    
+    // ★ペンモードのガイド点線（視認性向上版）
+    if(mode === 'pen' && penStart && penCurrent) {
+        ctx.beginPath();
+        ctx.setLineDash([6/cam.z, 3/cam.z]); // 間隔を詰めたはっきりした点線
+        ctx.strokeStyle = "rgba(255, 0, 0, 0.8)"; // 1本目からガッツリ濃く！
+        ctx.lineWidth = 2/cam.z;
+        const s = toS(penStart.x, penStart.y), e = toS(penCurrent.x, penCurrent.y);
+        ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y);
+        ctx.stroke();
+        ctx.setLineDash([]); // 描き終えたらリセット
+    }
+
     map.sort((a,b)=>(Math.round(a.x)+Math.round(a.y))-(Math.round(b.x)+Math.round(b.y))).forEach((d, i) => {
         const a = assets[d.aIdx]; if(!a) return; const w = T_W * d.s, h = (a.img.height/a.img.width) * w, anchor = toS(d.x + a.gw + d.ox, d.y + a.gh + d.oy); 
         ctx.drawImage(a.img, anchor.x - w / 2, anchor.y - h + d.off, w, h);
         let showFrame = false; if (lockedId === d.id) showFrame = true; else if (activeAsset === -1 && selIdx === i) showFrame = true;
         if(showFrame) {
+            ctx.setLineDash([]); // 建物枠は実線
             ctx.strokeStyle = "#007aff"; ctx.lineWidth = (lockedId ? 1 : 3)/cam.z;
             const gx = Math.round(d.x), gy = Math.round(d.y), pS = toS(gx+a.gw, gy+a.gh), pW = toS(gx, gy+a.gh), pE = toS(gx+a.gw, gy), pN = toS(gx, gy); 
             ctx.beginPath(); ctx.moveTo(pS.x,pS.y); ctx.lineTo(pW.x,pW.y); ctx.lineTo(pN.x,pN.y); ctx.lineTo(pE.x,pE.y); ctx.closePath(); ctx.stroke(); 
@@ -167,29 +185,14 @@ function handleStart(x, y) {
     const rawG = toG(x, y), gx_o = Math.floor(rawG.x), gy_o = Math.floor(rawG.y), gx_p = Math.round(rawG.x), gy_p = Math.round(rawG.y);
     if(mode === 'pen') { penStart = {x:gx_p, y:gy_p}; penCurrent = {x:gx_p, y:gy_p}; render(); return; }
     if(mode === 'p-erase') { lines = lines.filter(l => Math.hypot((l.x1+l.x2)/2-rawG.x,(l.y1+l.y2)/2-rawG.y)>0.5); save(); render(); return; }
-    
     let hitIdx = map.findLastIndex(d => { const a = assets[d.aIdx]; return rawG.x >= d.x && rawG.x < d.x + a.gw && rawG.y >= d.y && rawG.y < d.y + a.gh; });
-
     if(mode === 'erase' && hitIdx !== -1) { map.splice(hitIdx, 1); selIdx = -1; save(); render(); return; }
-    
     if(mode === 'move') {
-        // 既存の建物があれば掴む。この際、連続配置用の記憶(tempAssetStore)へ待避。
         if(hitIdx !== -1) {
             if(activeAsset !== -1) tempAssetStore = activeAsset; 
-            activeAsset = -1; 
-            updateCurBox(); 
-            selIdx = hitIdx; 
-            lockedId = map[selIdx].id; 
-            updatePanel(); 
-            render(); 
-            return;
+            activeAsset = -1; updateCurBox(); selIdx = hitIdx; lockedId = map[selIdx].id; updatePanel(); render(); return;
         }
-        // 空地をクリック。activeAssetがなければ、待避していたものがあれば復活。
-        if(activeAsset === -1 && tempAssetStore !== -1) {
-            activeAsset = tempAssetStore;
-            updateCurBox();
-        }
-
+        if(activeAsset === -1 && tempAssetStore !== -1) { activeAsset = tempAssetStore; updateCurBox(); }
         if(activeAsset !== -1) { 
             const a = assets[activeAsset], nx = gx_o - (a.gw-1), ny = gy_o - (a.gh-1); 
             if(!isBlocked(nx, ny, a.gw, a.gh)) { 
@@ -216,19 +219,9 @@ function handleMove(x, y, dx, dy) {
 }
 
 function handleEnd() { 
-    if(mode === 'pen' && penStart && penCurrent && (penStart.x !== penCurrent.x || penStart.y !== penCurrent.y)) { 
-        lines.push({x1:penStart.x, y1:penStart.y, x2:penCurrent.x, y2:penCurrent.y}); save(); 
-    } 
-    drag = pinch = false; 
-    lockedId = null; 
-    penStart = null; 
-    penCurrent = null; 
-    
-    // スマホで「置いた後」も選択状態を維持。tempAssetStoreから復帰。
-    if(activeAsset === -1 && tempAssetStore !== -1) {
-        activeAsset = tempAssetStore;
-        updateCurBox();
-    }
+    if(mode === 'pen' && penStart && penCurrent && (penStart.x !== penCurrent.x || penStart.y !== penCurrent.y)) { lines.push({x1:penStart.x, y1:penStart.y, x2:penCurrent.x, y2:penCurrent.y}); save(); } 
+    drag = pinch = false; lockedId = null; penStart = null; penCurrent = null; 
+    if(activeAsset === -1 && tempAssetStore !== -1) { activeAsset = tempAssetStore; updateCurBox(); }
     render(); 
 }
 
@@ -237,22 +230,8 @@ function setupEvents() {
     window.addEventListener('mousemove', e => { if(drag || lockedId || (mode==='pen' && penStart)) { handleMove(e.clientX, e.clientY, e.clientX-lastT.x, e.clientY-lastT.y); lastT = {x: e.clientX, y: e.clientY}; } });
     window.addEventListener('mouseup', handleEnd);
     cvs.addEventListener('wheel', e => { e.preventDefault(); const factor = e.deltaY > 0 ? 0.9 : 1.1; cam.z *= factor; render(); }, {passive: false});
-    
-    cvs.addEventListener('touchstart', e => { 
-        if(e.touches.length >= 2) { 
-            pinch = true; drag = false; lastDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); return; 
-        } 
-        const t = e.touches[0]; lastT = {x: t.clientX, y: t.clientY}; handleStart(t.clientX, t.clientY); 
-    }, {passive: false});
-    cvs.addEventListener('touchmove', e => { 
-        e.preventDefault(); 
-        if(pinch && e.touches.length >= 2) { 
-            const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); 
-            cam.z *= (d / lastDist); lastDist = d; 
-        } else if(!pinch) { 
-            const t = e.touches[0]; handleMove(t.clientX, t.clientY, t.clientX-lastT.x, t.clientY-lastT.y); lastT = {x: t.clientX, y: t.clientY}; 
-        } render(); 
-    }, {passive: false});
+    cvs.addEventListener('touchstart', e => { if(e.touches.length >= 2) { pinch = true; drag = false; lastDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); return; } const t = e.touches[0]; lastT = {x: t.clientX, y: t.clientY}; handleStart(t.clientX, t.clientY); }, {passive: false});
+    cvs.addEventListener('touchmove', e => { e.preventDefault(); if(pinch && e.touches.length >= 2) { const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); cam.z *= (d / lastDist); lastDist = d; } else if(!pinch) { const t = e.touches[0]; handleMove(t.clientX, t.clientY, t.clientX-lastT.x, t.clientY-lastT.y); lastT = {x: t.clientX, y: t.clientY}; } render(); }, {passive: false});
     cvs.addEventListener('touchend', handleEnd);
 }
 
