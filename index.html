@@ -3,48 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.60</title>
+    <title>避難所レイアウト v29.1.65</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
-        /* イクミさんの元の数値をベースに、入力欄1行分(35px)だけパネルを広げたよ */
-        :root { --panel-h: 285px; --panel-w: 240px; }
+        :root { --panel-h: 280px; --panel-w: 240px; }
         body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; display: flex; flex-direction: column; }
         #main-container { flex: 1; position: relative; overflow: hidden; }
         canvas { display: block; background: #f0f0f0; width: 100%; height: 100%; cursor: crosshair; }
         
-        #top-panel { position: absolute; top: 0; width: 100%; height: 65px; background: rgba(255,255,255,0.9); border-bottom: 1px solid #ccc; display: flex; align-items: center; padding: 0 10px; box-sizing: border-box; z-index: 100; gap: 8px; }
-        #cur-box { width: 50px; height: 50px; border: 2px solid #007aff; border-radius: 8px; background: #fff; background-size: contain; background-repeat: no-repeat; background-position: center; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #007aff; font-weight: bold; text-align: center; }
-        #open-list-btn { width: 50px; height: 50px; border-radius: 8px; border: 1px solid #ccc; background: #fff; font-size: 24px; color: #666; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; }
-        .deselect-btn { height: 50px; padding: 0 8px; border-radius: 8px; border: 1px solid #ccc; background: #eee; color: #666; font-size: 11px; font-weight: bold; flex-shrink: 0; cursor: pointer; }
-        .reload-btn { height: 50px; width: 50px; margin-left: auto; border-radius: 8px; border: 1px solid #ff9500; background: #fff; color: #ff9500; font-size: 20px; font-weight: bold; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; }
+        #top-panel { position: absolute; top: 0; width: 100%; height: 60px; background: rgba(255,255,255,0.9); border-bottom: 1px solid #ccc; display: flex; align-items: center; padding: 0 10px; box-sizing: border-box; z-index: 100; gap: 8px; }
+        #cur-box { width: 45px; height: 45px; border: 2px solid #007aff; border-radius: 8px; background: #fff; background-size: contain; background-repeat: no-repeat; background-position: center; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #007aff; font-weight: bold; text-align: center; }
+        #open-list-btn { width: 45px; height: 45px; border-radius: 8px; border: 1px solid #ccc; background: #fff; font-size: 24px; color: #666; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; }
+        .deselect-btn { height: 45px; padding: 0 8px; border-radius: 8px; border: 1px solid #ccc; background: #eee; color: #666; font-size: 11px; font-weight: bold; flex-shrink: 0; cursor: pointer; }
+        .reload-btn { height: 45px; width: 45px; margin-left: auto; border-radius: 8px; border: 1px solid #ff9500; background: #fff; color: #ff9500; font-size: 20px; font-weight: bold; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; }
 
-        #bot-panel { background: rgba(255,255,255,0.98); border-top: 1px solid #ccc; padding: 8px 10px; box-sizing: border-box; z-index: 100; display: flex; flex-direction: column; gap: 6px; height: var(--panel-h); }
+        #bot-panel { background: rgba(255,255,255,0.98); border-top: 1px solid #ccc; padding: 8px 10px; box-sizing: border-box; z-index: 100; display: flex; flex-direction: column; gap: 6px; height: var(--panel-h); flex-shrink: 0; }
         
         @media (orientation: landscape) { 
             body { flex-direction: row; } 
-            #bot-panel { width: var(--panel-w); height: 100%; border-top: none; border-left: 1px solid #ccc; padding: 10px 8px; overflow-y: auto; flex-shrink: 0; gap: 8px; } 
+            #bot-panel { width: var(--panel-w); height: 100%; border-top: none; border-left: 1px solid #ccc; padding: 10px 8px; overflow-y: auto; gap: 8px; } 
         }
         
         .row { display: flex; align-items: center; gap: 8px; }
-        .row label { font-size: 11px; font-weight: bold; width: 35px; }
-        input[type="range"] { flex: 1; height: 32px; cursor: pointer; }
-        .prec-btn { width: 34px; height: 32px; font-size: 16px; border: 1px solid #ccc; background: #fff; border-radius: 6px; cursor: pointer; }
-        
-        /* 名前入力欄のスタイル */
+        .row label { font-size: 11px; font-weight: bold; width: 35px; flex-shrink: 0; }
         #name-in { flex: 1; height: 32px; border: 1px solid #ccc; border-radius: 6px; padding: 0 8px; font-size: 14px; }
-
+        input[type="range"] { flex: 1; height: 32px; cursor: pointer; min-width: 0; }
+        .prec-btn { width: 34px; height: 32px; font-size: 16px; border: 1px solid #ccc; background: #fff; border-radius: 6px; cursor: pointer; flex-shrink: 0; }
+        
         .tool-section { display: flex; justify-content: space-between; gap: 8px; }
-        #nudge-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; width: 110px; flex-shrink: 0; }
-        #nudge-grid button { height: 40px; font-size: 20px; border: 1px solid #ccc; background: #fff; border-radius: 6px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 0 #ddd; cursor: pointer; }
+        #nudge-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; width: 105px; flex-shrink: 0; }
+        #nudge-grid button { height: 38px; font-size: 18px; border: 1px solid #ccc; background: #fff; border-radius: 6px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 0 #ddd; cursor: pointer; }
 
-        .mode-box { flex: 1; display: flex; flex-direction: column; gap: 4px; width: 100%; }
-        .mode-row { display: flex; gap: 3px; flex-wrap: wrap; }
-        .mode-row button { flex: 1; min-width: 44px; height: 32px; font-size: 10px; font-weight: bold; border-radius: 6px; border: 1px solid #ccc; background: #fff; cursor: pointer; }
+        .mode-box { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+        .mode-row { display: flex; gap: 3px; }
+        .mode-row button { flex: 1; height: 30px; font-size: 9px; font-weight: bold; border-radius: 6px; border: 1px solid #ccc; background: #fff; cursor: pointer; white-space: nowrap; }
         .mode-row button.active { background: #007aff; color: #fff; border-color: #007aff; }
-        .data-btn { flex: 1; height: 32px; font-size: 10px; font-weight: bold; border-radius: 6px; border: none; color: white; cursor: pointer; }
+        .data-btn { flex: 1; height: 30px; font-size: 10px; font-weight: bold; border-radius: 6px; border: none; color: white; cursor: pointer; }
         .btn-out { background: #5856d6; }
         .btn-clr { background: #ff3b30; }
-        .save-btn { height: 36px; font-size: 12px; background: #34c759; border: none; border-radius: 6px; color: white; font-weight: bold; cursor: pointer; }
+        .save-btn { height: 34px; font-size: 12px; background: #34c759; border: none; border-radius: 6px; color: white; font-weight: bold; cursor: pointer; }
 
         #asset-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; display: none; align-items: center; justify-content: center; }
         #asset-modal { width: 90%; max-height: 80%; background: #f0f0f0; border-radius: 12px; padding: 15px; display: flex; flex-direction: column; gap: 15px; }
@@ -99,23 +96,22 @@
 </div>
 
 <script>
-// --- 基本設定と変数 ---
+// --- 基本設定 (名前はすべてnullに変更) ---
 const PRESETS = [
-    { name: "HQ", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/HQ.png", s: 1.6, o: 1, gw: 2, gh: 2, ox: -0.1, oy: -0.2 },
-    { name: "DOOM", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/DOOM.png", s: 1.6, o: -3, gw: 2, gh: 2, ox: -0.2, oy: 0 },
-    { name: "MED", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/MED.png", s: 1.6, o: -1, gw: 2, gh: 2, ox: -0.1, oy: -0.1 },
-    { name: "SRG", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/SRG.png", s: 1.7, o: -3, gw: 2, gh: 2, ox: -0.1, oy: -0.1 },
-    { name: "RSS", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/RSS.png", s: 1.6, o: -4, gw: 2, gh: 2, ox: -0.2, oy: -0.3 },
-    { name: "ST", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/ST.png", s: 1.6, o: 0, gw: 2, gh: 2, ox: -0.2, oy: -0.2 },
-    { name: "OP", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/OP.png", s: 0.8, o: 0, gw: 1, gh: 1, ox: -0.1, oy: -0.1 },
-    { name: "ROCK2", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/ROCK2.png", s: 0.75, o: -5, gw: 1, gh: 1, ox: 0, oy: 0 }
+    { name: null, url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/HQ.png", s: 1.6, o: 1, gw: 2, gh: 2, ox: -0.1, oy: -0.2 },
+    { name: null, url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/DOOM.png", s: 1.6, o: -3, gw: 2, gh: 2, ox: -0.2, oy: 0 },
+    { name: null, url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/MED.png", s: 1.6, o: -1, gw: 2, gh: 2, ox: -0.1, oy: -0.1 },
+    { name: null, url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/SRG.png", s: 1.7, o: -3, gw: 2, gh: 2, ox: -0.1, oy: -0.1 },
+    { name: null, url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/RSS.png", s: 1.6, o: -4, gw: 2, gh: 2, ox: -0.2, oy: -0.3 },
+    { name: null, url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/ST.png", s: 1.6, o: 0, gw: 2, gh: 2, ox: -0.2, oy: -0.2 },
+    { name: null, url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/OP.png", s: 0.8, o: 0, gw: 1, gh: 1, ox: -0.1, oy: -0.1 },
+    { name: null, url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/ROCK2.png", s: 0.75, o: -5, gw: 1, gh: 1, ox: 0, oy: 0 }
 ];
 
 const cvs = document.getElementById('cvs'); const ctx = cvs.getContext('2d');
 const T_W = 64, T_H = 32;
 let cam = { x: 0, y: 0, z: 1 }, assets = [], map = [], lines = [], selIdx = -1, activeAsset = -1, mode = 'move';
-let drag = false, pinch = false, lockedId = null, penStart = null, penCurrent = null, lastT = {x: 0, y: 0}, lastDist = 0;
-let tempAssetStore = -1;
+let drag = false, lockedId = null, lastT = {x: 0, y: 0}, tempAssetStore = -1;
 
 function init() {
     window.addEventListener('resize', resize); resize();
@@ -129,7 +125,6 @@ function init() {
     setupEvents();
 }
 
-// --- 描画コア ---
 function drawTag(name, x, y) {
     if(!name) return;
     ctx.save();
@@ -158,9 +153,11 @@ function render() {
         const w = T_W * d.s, h = (a.img.height/a.img.width) * w, anchor = toS(d.x + a.gw + d.ox, d.y + a.gh + d.oy);
         ctx.drawImage(a.img, anchor.x - w / 2, anchor.y - h + d.off, w, h);
         
-        // 名前（個別優先 > プリセット）
-        const label = d.user || a.name;
-        if(label) drawTag(label, toS(d.x + a.gw/2, d.y + a.gh/2).x, toS(d.x + a.gw/2, d.y + a.gh/2).y);
+        // イクミさんが入力した名前(user)がある時だけ描画
+        if(d.user && d.user !== "") {
+            const p = toS(d.x + a.gw/2, d.y + a.gh/2);
+            drawTag(d.user, p.x, p.y);
+        }
 
         if(lockedId === d.id || (activeAsset === -1 && selIdx === i)) {
             ctx.strokeStyle = "#007aff"; ctx.lineWidth = (lockedId ? 1 : 3)/cam.z;
@@ -171,7 +168,6 @@ function render() {
     ctx.restore();
 }
 
-// --- システム関数 ---
 const toS = (gx, gy) => ({ x: (gx - gy) * (T_W/2), y: (gx + gy) * (T_H/2) });
 const toG = (sx, sy) => {
     let x = (sx - cam.x)/cam.z, y = (sy - cam.y)/cam.z;
@@ -194,10 +190,8 @@ function updateCurBox() {
     else { box.style.backgroundImage = 'none'; box.textContent = '未選択'; }
 }
 
-// --- イベント制御 ---
 function handleStart(x, y) {
     const rawG = toG(x, y), gx_o = Math.floor(rawG.x), gy_o = Math.floor(rawG.y);
-    if(mode === 'pen') { penStart = {x:Math.round(rawG.x), y:Math.round(rawG.y)}; return; }
     let hitIdx = map.findLastIndex(d => { const a = assets[d.aIdx]; return rawG.x >= d.x && rawG.x < d.x + a.gw && rawG.y >= d.y && rawG.y < d.y + a.gh; });
     if(mode === 'erase' && hitIdx !== -1) { map.splice(hitIdx, 1); selIdx = -1; save(); render(); return; }
     if(mode === 'move') {
@@ -216,9 +210,8 @@ function handleStart(x, y) {
     }
 }
 function handleMove(x, y, dx, dy) {
-    const rawG = toG(x, y);
     if(lockedId) {
-        const d = map.find(d => d.id === lockedId);
+        const rawG = toG(x, y), d = map.find(d => d.id === lockedId);
         if(d) {
             const a = assets[d.aIdx], nx = Math.floor(rawG.x) - (a.gw-1), ny = Math.floor(rawG.y) - (a.gh-1);
             if(!isBlocked(nx, ny, a.gw, a.gh, d.id)) { d.x = nx; d.y = ny; save(); }
@@ -227,14 +220,13 @@ function handleMove(x, y, dx, dy) {
 }
 function setupEvents() {
     cvs.addEventListener('mousedown', e => { lastT = {x: e.clientX, y: e.clientY}; handleStart(e.clientX, e.clientY); });
-    window.addEventListener('mousemove', e => { if(drag || lockedId) handleMove(e.clientX, e.clientY, e.clientX-lastT.x, e.clientY-lastT.y); lastT = {x: e.clientX, y: e.clientY}; render(); });
+    window.addEventListener('mousemove', e => { if(drag || lockedId) handleMove(e.clientX, e.clientY, e.clientX-lastT.x, e.clientY-lastT.y); lastT = {x: e.clientX, y: e.clientY}; });
     window.addEventListener('mouseup', () => { drag = false; lockedId = null; render(); });
     cvs.addEventListener('touchstart', e => { const t = e.touches[0]; lastT = {x: t.clientX, y: t.clientY}; handleStart(t.clientX, t.clientY); }, {passive: false});
     cvs.addEventListener('touchmove', e => { e.preventDefault(); const t = e.touches[0]; handleMove(t.clientX, t.clientY, t.clientX-lastT.x, t.clientY-lastT.y); lastT = {x: t.clientX, y: t.clientY}; }, {passive: false});
     cvs.addEventListener('touchend', () => { drag = false; lockedId = null; render(); });
 }
 
-// --- データ管理 ---
 function updateName(v) { if(selIdx!==-1){ map[selIdx].user=v; save(); render(); } }
 function updatePanel() {
     const nIn = document.getElementById('name-in');
