@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.44</title>
+    <title>避難所レイアウト v29.1.45</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
         :root { --panel-h: 250px; --panel-w: 220px; }
@@ -146,8 +146,7 @@ function isBlocked(gx, gy, gw, gh, ignoreId = null) {
 
 function render() {
     ctx.clearRect(0,0,cvs.width,cvs.height); ctx.save(); ctx.translate(cam.x, cam.y); ctx.scale(cam.z, cam.z);
-    ctx.setLineDash([]);
-    ctx.strokeStyle = "rgba(0,0,0,0.08)"; ctx.lineWidth = 1/cam.z;
+    ctx.setLineDash([]); ctx.strokeStyle = "rgba(0,0,0,0.08)"; ctx.lineWidth = 1/cam.z;
     for(let i=-20; i<=40; i++){ let s = toS(i,-20), e = toS(i,40); ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(e.x,e.y); ctx.stroke(); s = toS(-20,i); e = toS(40,i); ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(e.x,e.y); ctx.stroke(); }
     lines.forEach(l => { ctx.beginPath(); ctx.strokeStyle = "rgba(255,0,0,0.6)"; ctx.lineWidth = 4/cam.z; const s = toS(l.x1, l.y1), e = toS(l.x2, l.y2); ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke(); });
     if(mode === 'pen' && penStart && penCurrent) {
@@ -158,13 +157,13 @@ function render() {
         const a = assets[d.aIdx]; if(!a) return; const w = T_W * d.s, h = (a.img.height/a.img.width) * w, anchor = toS(d.x + a.gw + d.ox, d.y + a.gh + d.oy); 
         ctx.drawImage(a.img, anchor.x - w / 2, anchor.y - h + d.off, w, h);
         
-        // 名前タグ描画
+        // 名前タグ描画（足元に調整）
         if(d.t) {
             ctx.save();
             ctx.font = `bold ${14/cam.z}px sans-serif`;
             const textW = ctx.measureText(d.t).width;
-            const tx = anchor.x, ty = anchor.y - h + d.off - (10/cam.z);
-            ctx.fillStyle = "rgba(0,0,0,0.6)";
+            const tx = anchor.x, ty = anchor.y + d.off - (5/cam.z); 
+            ctx.fillStyle = "rgba(0,0,0,0.75)";
             ctx.fillRect(tx - textW/2 - 4/cam.z, ty - 14/cam.z, textW + 8/cam.z, 18/cam.z);
             ctx.fillStyle = "white"; ctx.textAlign = "center";
             ctx.fillText(d.t, tx, ty);
@@ -194,7 +193,6 @@ function handleStart(x, y) {
     }
     let hitIdx = map.findLastIndex(d => { const a = assets[d.aIdx]; return rawG.x >= d.x && rawG.x < d.x + a.gw && rawG.y >= d.y && rawG.y < d.y + a.gh; });
     
-    // 文字入力モード
     if(mode === 'text' && hitIdx !== -1) {
         const oldName = map[hitIdx].t || "";
         const newName = prompt("建物の名前を入力:", oldName);
