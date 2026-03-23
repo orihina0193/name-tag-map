@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.43_absolute_fix</title>
+    <title>避難所レイアウト v29.1.63</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
-        :root { --panel-h: 240px; --panel-w: 180px; }
+        :root { --panel-h: 240px; --panel-w: 220px; } /* 基本幅は220pxに戻す */
         body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; display: flex; flex-direction: column; }
         #main-container { flex: 1; position: relative; overflow: hidden; }
         canvas { display: block; background: #f0f0f0; width: 100%; height: 100%; cursor: crosshair; }
@@ -19,42 +19,59 @@
 
         #bot-panel { background: rgba(255,255,255,0.98); border-top: 1px solid #ccc; padding: 6px 10px; box-sizing: border-box; z-index: 100; display: flex; flex-direction: column; gap: 4px; height: var(--panel-h); }
         
-        /* --- 縦向き：v29.1.43 の配置を完全に復元 --- */
+        /* --- 核心デザイン1：スライダー行の「ギュッと」配置 --- */
         .row { display: flex; align-items: center; gap: 6px; }
-        .row label { font-size: 11px; font-weight: bold; width: 35px; flex-shrink: 0; }
+        .row label { font-size: 11px; font-weight: bold; width: 35px; flex-shrink: 0; white-space: pre-wrap; text-align: center; line-height: 1.1; } /* 縦書き風 */
         input[type="range"] { flex: 1; height: 30px; cursor: pointer; }
         .prec-btn { width: 32px; height: 30px; font-size: 14px; border: 1px solid #ccc; background: #fff; border-radius: 6px; cursor: pointer; flex-shrink: 0; }
         
         .tool-section { display: flex; justify-content: space-between; gap: 6px; }
-        #nudge-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; width: 110px; flex-shrink: 0; }
+
+        /* --- 核心デザイン2：十字キーの「Ｔ字」密着配置 --- */
+        #nudge-grid { 
+            display: grid; 
+            grid-template-areas: 
+                ".  up  ."
+                "left down right";
+            grid-template-rows: 1fr 1fr;
+            gap: 4px; 
+            width: 110px; 
+            flex-shrink: 0; 
+        }
+        .btn-up { grid-area: up; }
+        .btn-left { grid-area: left; }
+        .btn-down { grid-area: down; }
+        .btn-right { grid-area: right; }
         #nudge-grid button { height: 38px; font-size: 18px; border: 1px solid #ccc; background: #fff; border-radius: 6px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 0 #ddd; cursor: pointer; }
-        /* 十字キーの位置指定をシンプルに戻す */
-        .btn-up { grid-column: 2; }
-        .btn-left { grid-column: 1; }
-        .btn-down { grid-column: 2; }
-        .btn-right { grid-column: 3; }
 
         .mode-box { flex: 1; display: flex; flex-direction: column; gap: 4px; width: 100%; }
-        .mode-row { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
-        .mode-row button { height: 30px; font-size: 10px; font-weight: bold; border-radius: 6px; border: 1px solid #ccc; background: #fff; cursor: pointer; }
+        
+        /* --- 核心デザイン3：モード切り替えの「1行4並び」 --- */
+        .mode-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; }
+        .mode-row button { height: 30px; font-size: 10px; font-weight: bold; border-radius: 6px; border: 1px solid #ccc; background: #fff; cursor: pointer; white-space: nowrap; }
         .mode-row button.active { background: #007aff; color: #fff; border-color: #007aff; }
-        .data-btn { flex: 1; height: 30px; font-size: 10px; font-weight: bold; border-radius: 6px; border: none; color: white; cursor: pointer; }
+        
+        .data-box { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+        .data-btn { height: 30px; font-size: 10px; font-weight: bold; border-radius: 6px; border: none; color: white; cursor: pointer; }
         .btn-out { background: #5856d6; }
         .btn-clr { background: #ff3b30; }
         .save-btn { height: 34px; font-size: 11px; background: #34c759; border: none; border-radius: 6px; color: white; font-weight: bold; cursor: pointer; }
 
-        /* --- 横向き：縦に干渉しないよう最小限の調整 --- */
+        /* --- 横向き：Media Query内でのみ最小限の調整 --- */
         @media (orientation: landscape) { 
+            :root { --panel-w: 180px; } /* 横向き幅だけを180pxに */
             body { flex-direction: row; } 
             #bot-panel { width: var(--panel-w); height: 100%; border-top: none; border-left: 1px solid #ccc; padding: 8px 6px; overflow-y: auto; flex-shrink: 0; gap: 6px; } 
             .tool-section { flex-direction: column; gap: 8px; align-items: center; }
             
+            /* 横幅に合わせてラベルを少し小さくし、スライダーをはみ出させない */
             .row { width: 100%; gap: 4px; }
-            .row label { width: 28px; font-size: 10px; } /* 文字を少し詰めスライダーを確保 */
+            .row label { width: 28px; font-size: 10px; }
             input[type="range"] { min-width: 0; }
             
-            #nudge-grid { width: 105px; } 
+            #nudge-grid { width: 105px; } /* 十字キーを少しだけコンパクトに */
             .mode-box { width: 100%; }
+            .data-box { width: 100%; }
         }
 
         #asset-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; display: none; align-items: center; justify-content: center; }
@@ -86,8 +103,21 @@
 </div>
 
 <div id="bot-panel">
-    <div class="row"><label>サイズ</label><button class="prec-btn" onclick="adjS(-0.05)">-</button><input type="range" id="size-s" min="0.1" max="5" step="0.05"><button class="prec-btn" onclick="adjS(0.05)">+</button></div>
-    <div class="row"><label>接地</label><button class="prec-btn" onclick="adjO(-1)">-</button><input type="range" id="off-s" min="-100" max="100" step="1"><button class="prec-btn" onclick="adjO(1)">+</button></div>
+    <div class="row">
+        <label>サ
+イ
+ズ</label>
+        <button class="prec-btn" onclick="adjS(-0.05)">-</button>
+        <input type="range" id="size-s" min="0.1" max="5" step="0.05">
+        <button class="prec-btn" onclick="adjS(0.05)">+</button>
+    </div>
+    <div class="row">
+        <label>接
+地</label>
+        <button class="prec-btn" onclick="adjO(-1)">-</button>
+        <input type="range" id="off-s" min="-100" max="100" step="1">
+        <button class="prec-btn" onclick="adjO(1)">+</button>
+    </div>
     <div class="tool-section">
         <div id="nudge-grid">
             <button class="btn-up" onclick="nudge(0,-0.1)">↑</button>
@@ -97,7 +127,7 @@
         </div>
         <div class="mode-box">
             <button class="save-btn" onclick="exportImage()">画像として保存</button>
-            <div style="display:flex; gap:3px;">
+            <div class="data-box">
                 <button class="data-btn btn-out" onclick="exportURL()">共有URL</button>
                 <button class="data-btn btn-clr" onclick="clearAll()">全消去</button>
             </div>
@@ -113,8 +143,7 @@
 <div id="export-overlay" onclick="this.style.display='none'"><img id="export-img" src=""></div>
 
 <script>
-// ロジック部分は一切変更せず、Ikumiさんが使い慣れた v29.1.43 のものを搭載しています。
-// (以下、以前のJSコードと同じため省略せず記述します)
+// (JSロジックは安定版 v29.1.43 を継承)
 const PRESETS = [
     { name: "HQ", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/HQ.png", s: 1.6, o: 1, gw: 2, gh: 2, ox: -0.1, oy: -0.2 },
     { name: "DOOM", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/DOOM.png", s: 1.6, o: -3, gw: 2, gh: 2, ox: -0.2, oy: 0 },
@@ -132,17 +161,7 @@ let cam = { x: 0, y: 0, z: 1 }, assets = [], map = [], lines = [], selIdx = -1, 
 let drag = false, pinch = false, lockedId = null, penStart = null, penCurrent = null, lastT = {x: 0, y: 0}, lastDist = 0;
 let tempAssetStore = -1;
 
-function init() { 
-    window.addEventListener('resize', resize); resize(); 
-    cam.x = cvs.width/2; cam.y = cvs.height/3; 
-    loadPresets().then(() => { 
-        const params = new URLSearchParams(window.location.search); 
-        const urlData = params.get('d'); 
-        if (urlData) applyData(urlData); else load(); 
-        render(); 
-    }); 
-    setupEvents(); 
-}
+function init() { window.addEventListener('resize', resize); resize(); cam.x = cvs.width/2; cam.y = cvs.height/3; loadPresets().then(() => { const params = new URLSearchParams(window.location.search); const urlData = params.get('d'); if (urlData) applyData(urlData); else load(); render(); }); setupEvents(); }
 
 function toggleAssetModal(show) { document.getElementById('asset-overlay').style.display = show ? 'flex' : 'none'; }
 function addThumb(idx) { const d = document.createElement('div'); d.className = 'thumb'; d.style.backgroundImage = `url(${assets[idx].src})`; d.onclick = () => { activeAsset = idx; tempAssetStore = idx; selIdx = -1; lockedId = null; setMode('move'); updateCurBox(); toggleAssetModal(false); render(); }; document.getElementById('asset-grid').appendChild(d); }
@@ -171,79 +190,25 @@ function isBlocked(gx, gy, gw, gh, ignoreId = null) {
     return false;
 }
 
-function render() {
-    ctx.clearRect(0,0,cvs.width,cvs.height); ctx.save(); ctx.translate(cam.x, cam.y); ctx.scale(cam.z, cam.z);
-    ctx.strokeStyle = "rgba(0,0,0,0.08)"; ctx.lineWidth = 1/cam.z;
-    for(let i=-20; i<=40; i++){ let s = toS(i,-20), e = toS(i,40); ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(e.x,e.y); ctx.stroke(); s = toS(-20,i); e = toS(40,i); ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(e.x,e.y); ctx.stroke(); }
-    lines.forEach(l => { ctx.beginPath(); ctx.strokeStyle = "rgba(255,0,0,0.6)"; ctx.lineWidth = 4/cam.z; const s = toS(l.x1, l.y1), e = toS(l.x2, l.y2); ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke(); });
-    if(mode === 'pen' && penStart && penCurrent) {
-        ctx.beginPath(); ctx.setLineDash([6/cam.z, 3/cam.z]); ctx.strokeStyle = "rgba(255, 0, 0, 0.8)"; ctx.lineWidth = 2/cam.z;
-        const s = toS(penStart.x, penStart.y), e = toS(penCurrent.x, penCurrent.y); ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke(); ctx.setLineDash([]);
-    }
-    map.sort((a,b)=>(Math.round(a.x)+Math.round(a.y))-(Math.round(b.x)+Math.round(b.y))).forEach((d, i) => {
-        const a = assets[d.aIdx]; if(!a) return; const w = T_W * d.s, h = (a.img.height/a.img.width) * w, anchor = toS(d.x + a.gw + d.ox, d.y + a.gh + d.oy); 
-        ctx.drawImage(a.img, anchor.x - w / 2, anchor.y - h + d.off, w, h);
-        if(lockedId === d.id || (activeAsset === -1 && selIdx === i)) {
-            ctx.setLineDash([]); ctx.strokeStyle = "#007aff"; ctx.lineWidth = (lockedId ? 1 : 3)/cam.z;
-            const gx = Math.round(d.x), gy = Math.round(d.y), pS = toS(gx+a.gw, gy+a.gh), pW = toS(gx, gy+a.gh), pE = toS(gx+a.gw, gy), pN = toS(gx, gy); 
-            ctx.beginPath(); ctx.moveTo(pS.x,pS.y); ctx.lineTo(pW.x,pW.y); ctx.lineTo(pN.x,pN.y); ctx.lineTo(pE.x,pE.y); ctx.closePath(); ctx.stroke(); 
-        }
-    });
-    ctx.restore();
-}
+function render() { ctx.clearRect(0,0,cvs.width,cvs.height); ctx.save(); ctx.translate(cam.x, cam.y); ctx.scale(cam.z, cam.z); ctx.strokeStyle = "rgba(0,0,0,0.08)"; ctx.lineWidth = 1/cam.z; for(let i=-20; i<=40; i++){ let s = toS(i,-20), e = toS(i,40); ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(e.x,e.y); ctx.stroke(); s = toS(-20,i); e = toS(40,i); ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(e.x,e.y); ctx.stroke(); } lines.forEach(l => { ctx.beginPath(); ctx.strokeStyle = "rgba(255,0,0,0.6)"; ctx.lineWidth = 4/cam.z; const s = toS(l.x1, l.y1), e = toS(l.x2, l.y2); ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke(); }); if(mode === 'pen' && penStart && penCurrent) { ctx.beginPath(); ctx.setLineDash([6/cam.z, 3/cam.z]); ctx.strokeStyle = "rgba(255, 0, 0, 0.8)"; ctx.lineWidth = 2/cam.z; const s = toS(penStart.x, penStart.y), e = toS(penCurrent.x, penCurrent.y); ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke(); ctx.setLineDash([]); } map.sort((a,b)=>(Math.round(a.x)+Math.round(a.y))-(Math.round(b.x)+Math.round(b.y))).forEach((d, i) => { const a = assets[d.aIdx]; if(!a) return; const w = T_W * d.s, h = (a.img.height/a.img.width) * w, anchor = toS(d.x + a.gw + d.ox, d.y + a.gh + d.oy); ctx.drawImage(a.img, anchor.x - w / 2, anchor.y - h + d.off, w, h); if(lockedId === d.id || (activeAsset === -1 && selIdx === i)) { ctx.setLineDash([]); ctx.strokeStyle = "#007aff"; ctx.lineWidth = (lockedId ? 1 : 3)/cam.z; const gx = Math.round(d.x), gy = Math.round(d.y), pS = toS(gx+a.gw, gy+a.gh), pW = toS(gx, gy+a.gh), pE = toS(gx+a.gw, gy), pN = toS(gx, gy); ctx.beginPath(); ctx.moveTo(pS.x,pS.y); ctx.lineTo(pW.x,pW.y); ctx.lineTo(pN.x,pN.y); ctx.lineTo(pE.x,pE.y); ctx.closePath(); ctx.stroke(); } }); ctx.restore(); }
 
 function handleStart(x, y) {
     const rawG = toG(x, y), gx_o = Math.floor(rawG.x), gy_o = Math.floor(rawG.y), gx_p = Math.round(rawG.x), gy_p = Math.round(rawG.y);
     if(mode === 'pen') { penStart = {x:gx_p, y:gy_p}; penCurrent = {x:gx_p, y:gy_p}; render(); return; }
-    if(mode === 'p-erase') {
-        const distToSeg = (p, v, w) => {
-            const l2 = Math.pow(v.x-w.x,2) + Math.pow(v.y-w.y,2);
-            if(l2 === 0) return Math.hypot(p.x-v.x, p.y-v.y);
-            let t = Math.max(0, Math.min(1, ((p.x-v.x)*(w.x-v.x) + (p.y-v.y)*(w.y-v.y)) / l2));
-            return Math.hypot(p.x-(v.x+t*(w.x-v.x)), p.y-(v.y+t*(w.y-v.y)));
-        };
-        lines = lines.filter(l => distToSeg(rawG, {x:l.x1, y:l.y1}, {x:l.x2, y:l.y2}) > 0.5);
-        save(); render(); return;
-    }
+    if(mode === 'p-erase') { const distToSeg = (p, v, w) => { const l2 = Math.pow(v.x-w.x,2) + Math.pow(v.y-w.y,2); if(l2 === 0) return Math.hypot(p.x-v.x, p.y-v.y); let t = Math.max(0, Math.min(1, ((p.x-v.x)*(w.x-v.x) + (p.y-v.y)*(w.y-v.y)) / l2)); return Math.hypot(p.x-(v.x+t*(w.x-v.x)), p.y-(v.y+t*(w.y-v.y))); }; lines = lines.filter(l => distToSeg(rawG, {x:l.x1, y:l.y1}, {x:l.x2, y:l.y2}) > 0.5); save(); render(); return; }
     let hitIdx = map.findLastIndex(d => { const a = assets[d.aIdx]; return rawG.x >= d.x && rawG.x < d.x + a.gw && rawG.y >= d.y && rawG.y < d.y + a.gh; });
     if(mode === 'erase' && hitIdx !== -1) { map.splice(hitIdx, 1); selIdx = -1; save(); render(); return; }
-    if(mode === 'move') {
-        if(hitIdx !== -1) { if(activeAsset !== -1) tempAssetStore = activeAsset; activeAsset = -1; updateCurBox(); selIdx = hitIdx; lockedId = map[selIdx].id; updatePanel(); render(); return; }
-        if(activeAsset === -1 && tempAssetStore !== -1) { activeAsset = tempAssetStore; updateCurBox(); }
-        if(activeAsset !== -1) { 
-            const a = assets[activeAsset], nx = gx_o - (a.gw-1), ny = gy_o - (a.gh-1); 
-            if(!isBlocked(nx, ny, a.gw, a.gh)) { const n = {id: Date.now(), x: nx, y: ny, aIdx: activeAsset, s: a.defS, off: a.defO, ox: a.ox, oy: a.oy}; map.push(n); selIdx = map.length - 1; lockedId = n.id; updatePanel(); save(); render(); return; } 
-        }
-        selIdx = -1; lockedId = null; drag = true; render();
-    }
+    if(mode === 'move') { if(hitIdx !== -1) { if(activeAsset !== -1) tempAssetStore = activeAsset; activeAsset = -1; updateCurBox(); selIdx = hitIdx; lockedId = map[selIdx].id; updatePanel(); render(); return; } if(activeAsset === -1 && tempAssetStore !== -1) { activeAsset = tempAssetStore; updateCurBox(); } if(activeAsset !== -1) { const a = assets[activeAsset], nx = gx_o - (a.gw-1), ny = gy_o - (a.gh-1); if(!isBlocked(nx, ny, a.gw, a.gh)) { const n = {id: Date.now(), x: nx, y: ny, aIdx: activeAsset, s: a.defS, off: a.defO, ox: a.ox, oy: a.oy}; map.push(n); selIdx = map.length - 1; lockedId = n.id; updatePanel(); save(); render(); return; } } selIdx = -1; lockedId = null; drag = true; render(); }
 }
 
 function handleMove(x, y, dx, dy) {
-    const rawG = toG(x, y); 
-    if(mode === 'pen' && penStart) { penCurrent = {x: Math.round(rawG.x), y: Math.round(rawG.y)}; render(); return; }
-    if(lockedId) { 
-        const dIdx = map.findIndex(d => d.id === lockedId); 
-        if(dIdx !== -1) { 
-            const d = map[dIdx], a = assets[d.aIdx], nx = Math.floor(rawG.x) - (a.gw-1), ny = Math.floor(rawG.y) - (a.gh-1); 
-            if(!isBlocked(nx, ny, a.gw, a.gh, d.id)) { d.x = nx; d.y = ny; selIdx = dIdx; save(); } 
-        } 
-    } else if(drag) { cam.x += dx; cam.y += dy; } render();
+    const rawG = toG(x, y); if(mode === 'pen' && penStart) { penCurrent = {x: Math.round(rawG.x), y: Math.round(rawG.y)}; render(); return; }
+    if(lockedId) { const dIdx = map.findIndex(d => d.id === lockedId); if(dIdx !== -1) { const d = map[dIdx], a = assets[d.aIdx], nx = Math.floor(rawG.x) - (a.gw-1), ny = Math.floor(rawG.y) - (a.gh-1); if(!isBlocked(nx, ny, a.gw, a.gh, d.id)) { d.x = nx; d.y = ny; selIdx = dIdx; save(); } } } else if(drag) { cam.x += dx; cam.y += dy; } render();
 }
 
-function handleEnd() { 
-    if(mode === 'pen' && penStart && penCurrent && (penStart.x !== penCurrent.x || penStart.y !== penCurrent.y)) { lines.push({x1:penStart.x, y1:penStart.y, x2:penCurrent.x, y2:penCurrent.y}); save(); } 
-    drag = pinch = false; lockedId = null; penStart = null; penCurrent = null; if(activeAsset === -1 && tempAssetStore !== -1) { activeAsset = tempAssetStore; updateCurBox(); } render(); 
-}
+function handleEnd() { if(mode === 'pen' && penStart && penCurrent && (penStart.x !== penCurrent.x || penStart.y !== penCurrent.y)) { lines.push({x1:penStart.x, y1:penStart.y, x2:penCurrent.x, y2:penCurrent.y}); save(); } drag = pinch = false; lockedId = null; penStart = null; penCurrent = null; if(activeAsset === -1 && tempAssetStore !== -1) { activeAsset = tempAssetStore; updateCurBox(); } render(); }
 
-function setupEvents() {
-    cvs.addEventListener('mousedown', e => { lastT = {x: e.clientX, y: e.clientY}; handleStart(e.clientX, e.clientY); });
-    window.addEventListener('mousemove', e => { if(drag || lockedId || (mode==='pen' && penStart)) { handleMove(e.clientX, e.clientY, e.clientX-lastT.x, e.clientY-lastT.y); lastT = {x: e.clientX, y: e.clientY}; } });
-    window.addEventListener('mouseup', handleEnd);
-    cvs.addEventListener('wheel', e => { e.preventDefault(); cam.z *= (e.deltaY > 0 ? 0.9 : 1.1); render(); }, {passive: false});
-    cvs.addEventListener('touchstart', e => { if(e.touches.length >= 2) { pinch = true; lastDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); return; } const t = e.touches[0]; lastT = {x: t.clientX, y: t.clientY}; handleStart(t.clientX, t.clientY); }, {passive: false});
-    cvs.addEventListener('touchmove', e => { e.preventDefault(); if(pinch && e.touches.length >= 2) { const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); cam.z *= (d / lastDist); lastDist = d; } else if(!pinch) { const t = e.touches[0]; handleMove(t.clientX, t.clientY, t.clientX-lastT.x, t.clientY-lastT.y); lastT = {x: t.clientX, y: t.clientY}; } render(); }, {passive: false});
-    cvs.addEventListener('touchend', handleEnd);
-}
+function setupEvents() { cvs.addEventListener('mousedown', e => { lastT = {x: e.clientX, y: e.clientY}; handleStart(e.clientX, e.clientY); }); window.addEventListener('mousemove', e => { if(drag || lockedId || (mode==='pen' && penStart)) { handleMove(e.clientX, e.clientY, e.clientX-lastT.x, e.clientY-lastT.y); lastT = {x: e.clientX, y: e.clientY}; } }); window.addEventListener('mouseup', handleEnd); cvs.addEventListener('wheel', e => { e.preventDefault(); cam.z *= (e.deltaY > 0 ? 0.9 : 1.1); render(); }, {passive: false}); cvs.addEventListener('touchstart', e => { if(e.touches.length >= 2) { pinch = true; lastDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); return; } const t = e.touches[0]; lastT = {x: t.clientX, y: t.clientY}; handleStart(t.clientX, t.clientY); }, {passive: false}); cvs.addEventListener('touchmove', e => { e.preventDefault(); if(pinch && e.touches.length >= 2) { const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); cam.z *= (d / lastDist); lastDist = d; } else if(!pinch) { const t = e.touches[0]; handleMove(t.clientX, t.clientY, t.clientX-lastT.x, t.clientY-lastT.y); lastT = {x: t.clientX, y: t.clientY}; } render(); }, {passive: false}); cvs.addEventListener('touchend', handleEnd); }
 
 function deselect() { activeAsset = -1; tempAssetStore = -1; selIdx = -1; lockedId = null; updateCurBox(); render(); }
 async function loadPresets() { for (const p of PRESETS) { await new Promise(res => { const img = new Image(); img.crossOrigin = "anonymous"; img.onload = () => { const src = crop(img), i2 = new Image(); i2.onload = () => { assets.push({ img: i2, src, name: p.name, defS: p.s, defO: p.o, gw: p.gw, gh: p.gh, ox: p.ox, oy: p.oy }); addThumb(assets.length - 1); res(); }; i2.src = src; }; img.src = p.url; }); } }
@@ -258,7 +223,9 @@ function nudge(dx,dy) { if(selIdx!==-1){ map[selIdx].ox=parseFloat((map[selIdx].
 function clearAll() { if(confirm("配置をすべて消去しますか？")){ map=[]; lines=[]; selIdx=-1; lockedId=null; save(); render(); } }
 function exportImage() { deselect(); render(); document.getElementById('export-img').src = cvs.toDataURL(); document.getElementById('export-overlay').style.display='flex'; }
 function crop(img) { const c = document.createElement('canvas'), t = c.getContext('2d'); c.width = img.width; c.height = img.height; t.drawImage(img,0,0); const d = t.getImageData(0,0,c.width,c.height).data; let x1=c.width, y1=c.height, x2=0, y2=0; for(let y=0; y<c.height; y++) for(let x=0; x<c.width; x++) if(d[(y*c.width+x)*4+3]>10){ x1=Math.min(x1,x); y1=Math.min(y1,y); x2=Math.max(x2,x); y2=Math.max(y2,y); } const w = x2-x1+1, h = y2-y1+1, c2 = document.createElement('canvas'); c2.width = w; c2.height = h; c2.getContext('2d').drawImage(img,x1,y1,w,h,0,0,w,h); return c2.toDataURL(); }
+
 init();
+
 document.getElementById('size-s').addEventListener('input', (e) => { if(selIdx!==-1){ map[selIdx].s = parseFloat(e.target.value); render(); } });
 document.getElementById('off-s').addEventListener('input', (e) => { if(selIdx!==-1){ map[selIdx].off = parseInt(e.target.value); render(); } });
 </script>
