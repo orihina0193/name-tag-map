@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.60</title>
+    <title>避難所レイアウト v29.1.61</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
         :root { --panel-h: 240px; --panel-w: 200px; }
@@ -23,7 +23,10 @@
             body { flex-direction: row; } 
             #bot-panel { width: var(--panel-w); height: 100%; border-top: none; border-left: 1px solid #ccc; padding: 8px; overflow: hidden; flex-shrink: 0; gap: 6px; } 
             .tool-section { flex-direction: column; gap: 6px; align-items: center; }
-            .row label { width: 30px; font-size: 10px; }
+            /* 横画面時のスライダー幅調整 */
+            .row { width: 100%; gap: 4px; }
+            .row label { width: 28px; font-size: 9px; }
+            input[type="range"] { min-width: 0; }
             #nudge-grid { width: 100px; }
             #nudge-grid button { height: 35px; }
         }
@@ -31,15 +34,15 @@
         .row { display: flex; align-items: center; gap: 6px; }
         .row label { font-size: 11px; font-weight: bold; width: 35px; flex-shrink: 0; }
         input[type="range"] { flex: 1; height: 30px; cursor: pointer; }
-        .prec-btn { width: 32px; height: 30px; font-size: 14px; border: 1px solid #ccc; background: #fff; border-radius: 6px; cursor: pointer; }
+        .prec-btn { width: 32px; height: 30px; font-size: 14px; border: 1px solid #ccc; background: #fff; border-radius: 6px; cursor: pointer; flex-shrink: 0; }
         
         .tool-section { display: flex; justify-content: space-between; gap: 6px; }
         #nudge-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; width: 110px; flex-shrink: 0; }
         #nudge-grid button { height: 38px; font-size: 18px; border: 1px solid #ccc; background: #fff; border-radius: 6px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 0 #ddd; cursor: pointer; }
-        .btn-up { grid-column: 2; }
-        .btn-left { grid-column: 1; }
-        .btn-down { grid-column: 2; }
-        .btn-right { grid-column: 3; }
+        .btn-up { grid-column: 2; grid-row: 1; }
+        .btn-left { grid-column: 1; grid-row: 2; }
+        .btn-down { grid-column: 2; grid-row: 2; }
+        .btn-right { grid-column: 3; grid-row: 2; }
 
         .mode-box { flex: 1; display: flex; flex-direction: column; gap: 4px; width: 100%; }
         .mode-row { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
@@ -106,6 +109,7 @@
 <div id="export-overlay" onclick="this.style.display='none'"><img id="export-img" src=""></div>
 
 <script>
+// (JS部分は前回の v29.1.60 と同じですが、十字キーの grid-row 指定により配置を固定しています)
 const PRESETS = [
     { name: "HQ", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/HQ.png", s: 1.6, o: 1, gw: 2, gh: 2, ox: -0.1, oy: -0.2 },
     { name: "DOOM", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/DOOM.png", s: 1.6, o: -3, gw: 2, gh: 2, ox: -0.2, oy: 0 },
