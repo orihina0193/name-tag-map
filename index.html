@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.45</title>
+    <title>避難所レイアウト v29.1.46</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
         :root { --panel-h: 250px; --panel-w: 220px; }
@@ -162,23 +162,37 @@ function render() {
         ctx.setLineDash([]);
     }
 
-    // ★ プレビュータグ（建物に被る位置に戻し、ズーム追従を維持）
+    // プレビュータグ（足元被り）
     if(activeAsset !== -1 && !lockedId) {
         const a = assets[activeAsset];
         const rawG = toG(lastT.x, lastT.y), gx = Math.floor(rawG.x) - (a.gw-1), gy = Math.floor(rawG.y) - (a.gh-1);
-        const pS = toS(gx + a.gw/2, gy + a.gh/2); // 建物の中心
-        
+        const pS = toS(gx + a.gw/2, gy + a.gh/2);
         ctx.save();
-        ctx.translate(pS.x, pS.y - 15/cam.z); // 被りつつ少しだけ浮かせる（足元付近）
-        const tagSize = 60 / cam.z; // ズームに合わせてスケール
-        ctx.globalAlpha = 0.7;
+        ctx.translate(pS.x, pS.y);
+        const tagSize = 45 / cam.z;
+        ctx.globalAlpha = 0.6;
         ctx.drawImage(a.img, -tagSize/2, -tagSize/2, tagSize, tagSize);
         ctx.restore();
     }
 
     map.sort((a,b)=>(Math.round(a.x)+Math.round(a.y))-(Math.round(b.x)+Math.round(b.y))).forEach((d, i) => {
-        const a = assets[d.aIdx]; if(!a) return; const w = T_W * d.s, h = (a.img.height/a.img.width) * w, anchor = toS(d.x + a.gw + d.ox, d.y + a.gh + d.oy); 
+        const a = assets[d.aIdx]; if(!a) return;
+        const w = T_W * d.s, h = (a.img.height/a.img.width) * w, anchor = toS(d.x + a.gw + d.ox, d.y + a.gh + d.oy); 
+        
+        // 建物本体
         ctx.drawImage(a.img, anchor.x - w / 2, anchor.y - h + d.off, w, h);
+
+        // ★ 配置済み建物のネームタグ（ズーム追従）
+        if (a.name) {
+            ctx.save();
+            const pS = toS(d.x + a.gw/2, d.y + a.gh/2); 
+            ctx.translate(pS.x, pS.y);
+            const tagSize = 40 / cam.z; 
+            ctx.globalAlpha = 0.8;
+            ctx.drawImage(a.img, -tagSize/2, -tagSize/2, tagSize, tagSize);
+            ctx.restore();
+        }
+
         let showFrame = false; if (lockedId === d.id) showFrame = true; else if (activeAsset === -1 && selIdx === i) showFrame = true;
         if(showFrame) {
             ctx.setLineDash([]);
@@ -271,7 +285,4 @@ function exportImage() { deselect(); render(); document.getElementById('export-i
 function crop(img) { const c = document.createElement('canvas'), t = c.getContext('2d'); c.width = img.width; c.height = img.height; t.drawImage(img,0,0); const d = t.getImageData(0,0,c.width,c.height).data; let x1=c.width, y1=c.height, x2=0, y2=0; for(let y=0; y<c.height; y++) for(let x=0; x<c.width; x++) if(d[(y*c.width+x)*4+3]>10){ x1=Math.min(x1,x); y1=Math.min(y1,y); x2=Math.max(x2,x); y2=Math.max(y2,y); } const w = x2-x1+1, h = y2-y1+1, c2 = document.createElement('canvas'); c2.width = w; c2.height = h; c2.getContext('2d').drawImage(img,x1,y1,w,h,0,0,w,h); return c2.toDataURL(); }
 init();
 document.getElementById('size-s').addEventListener('input', (e) => { if(selIdx!==-1){ map[selIdx].s = parseFloat(e.target.value); render(); } });
-document.getElementById('off-s').addEventListener('input', (e) => { if(selIdx!==-1){ map[selIdx].off = parseInt(e.target.value); render(); } });
-</script>
-</body>
-</html>
+document.getElementById('off-s').
