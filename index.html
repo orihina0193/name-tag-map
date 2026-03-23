@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.61</title>
+    <title>避難所レイアウト v29.1.62</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
-        :root { --panel-h: 240px; --panel-w: 200px; }
+        :root { --panel-h: 260px; --panel-w: 200px; }
         body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; display: flex; flex-direction: column; }
         #main-container { flex: 1; position: relative; overflow: hidden; }
         canvas { display: block; background: #f0f0f0; width: 100%; height: 100%; cursor: crosshair; }
@@ -17,41 +17,51 @@
         .deselect-btn { height: 45px; padding: 0 6px; border-radius: 8px; border: 1px solid #ccc; background: #eee; color: #666; font-size: 10px; font-weight: bold; flex-shrink: 0; cursor: pointer; }
         .reload-btn { height: 45px; width: 45px; margin-left: auto; border-radius: 8px; border: 1px solid #ff9500; background: #fff; color: #ff9500; font-size: 18px; font-weight: bold; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; }
 
-        #bot-panel { background: rgba(255,255,255,0.98); border-top: 1px solid #ccc; padding: 6px 10px; box-sizing: border-box; z-index: 100; display: flex; flex-direction: column; gap: 4px; height: var(--panel-h); }
+        #bot-panel { background: rgba(255,255,255,0.98); border-top: 1px solid #ccc; padding: 8px 12px; box-sizing: border-box; z-index: 100; display: flex; flex-direction: column; gap: 8px; height: var(--panel-h); }
         
-        @media (orientation: landscape) { 
-            body { flex-direction: row; } 
-            #bot-panel { width: var(--panel-w); height: 100%; border-top: none; border-left: 1px solid #ccc; padding: 8px; overflow: hidden; flex-shrink: 0; gap: 6px; } 
-            .tool-section { flex-direction: column; gap: 6px; align-items: center; }
-            /* 横画面時のスライダー幅調整 */
-            .row { width: 100%; gap: 4px; }
-            .row label { width: 28px; font-size: 9px; }
-            input[type="range"] { min-width: 0; }
-            #nudge-grid { width: 100px; }
-            #nudge-grid button { height: 35px; }
-        }
+        /* スライダー行のレイアウト改善 */
+        .row { display: flex; flex-direction: column; gap: 2px; }
+        .row-label { font-size: 11px; font-weight: bold; color: #333; }
+        .row-controls { display: flex; align-items: center; gap: 8px; }
+        input[type="range"] { flex: 1; height: 35px; cursor: pointer; }
+        .prec-btn { width: 36px; height: 34px; font-size: 16px; border: 1px solid #ccc; background: #fff; border-radius: 6px; cursor: pointer; flex-shrink: 0; }
         
-        .row { display: flex; align-items: center; gap: 6px; }
-        .row label { font-size: 11px; font-weight: bold; width: 35px; flex-shrink: 0; }
-        input[type="range"] { flex: 1; height: 30px; cursor: pointer; }
-        .prec-btn { width: 32px; height: 30px; font-size: 14px; border: 1px solid #ccc; background: #fff; border-radius: 6px; cursor: pointer; flex-shrink: 0; }
-        
-        .tool-section { display: flex; justify-content: space-between; gap: 6px; }
-        #nudge-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; width: 110px; flex-shrink: 0; }
-        #nudge-grid button { height: 38px; font-size: 18px; border: 1px solid #ccc; background: #fff; border-radius: 6px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 0 #ddd; cursor: pointer; }
-        .btn-up { grid-column: 2; grid-row: 1; }
-        .btn-left { grid-column: 1; grid-row: 2; }
-        .btn-down { grid-column: 2; grid-row: 2; }
-        .btn-right { grid-column: 3; grid-row: 2; }
+        .tool-section { display: flex; justify-content: space-between; gap: 10px; margin-top: 4px; }
 
-        .mode-box { flex: 1; display: flex; flex-direction: column; gap: 4px; width: 100%; }
-        .mode-row { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
-        .mode-row button { height: 30px; font-size: 10px; font-weight: bold; border-radius: 6px; border: 1px solid #ccc; background: #fff; cursor: pointer; }
+        /* 十字キーの配置を完全に固定 */
+        #nudge-grid { 
+            display: grid; 
+            grid-template-areas: 
+                ".  up  ."
+                "left down right";
+            gap: 4px; 
+            width: 120px; 
+            flex-shrink: 0; 
+        }
+        .btn-up { grid-area: up; }
+        .btn-left { grid-area: left; }
+        .btn-down { grid-area: down; }
+        .btn-right { grid-area: right; }
+        #nudge-grid button { height: 40px; font-size: 18px; border: 1px solid #ccc; background: #fff; border-radius: 6px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 0 #ddd; cursor: pointer; }
+
+        .mode-box { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+        .mode-row { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+        .mode-row button { height: 32px; font-size: 10px; font-weight: bold; border-radius: 6px; border: 1px solid #ccc; background: #fff; cursor: pointer; }
         .mode-row button.active { background: #007aff; color: #fff; border-color: #007aff; }
-        .data-btn { flex: 1; height: 30px; font-size: 10px; font-weight: bold; border-radius: 6px; border: none; color: white; cursor: pointer; }
+        .data-btn { flex: 1; height: 32px; font-size: 10px; font-weight: bold; border-radius: 6px; border: none; color: white; cursor: pointer; }
         .btn-out { background: #5856d6; }
         .btn-clr { background: #ff3b30; }
-        .save-btn { height: 34px; font-size: 11px; background: #34c759; border: none; border-radius: 6px; color: white; font-weight: bold; cursor: pointer; }
+        .save-btn { height: 36px; font-size: 11px; background: #34c759; border: none; border-radius: 6px; color: white; font-weight: bold; cursor: pointer; }
+
+        @media (orientation: landscape) { 
+            body { flex-direction: row; } 
+            #bot-panel { width: var(--panel-w); height: 100%; border-top: none; border-left: 1px solid #ccc; padding: 10px; overflow-y: auto; flex-shrink: 0; gap: 10px; } 
+            .tool-section { flex-direction: column; align-items: center; }
+            #nudge-grid { width: 100%; }
+            #nudge-grid button { height: 36px; }
+            .row-controls { gap: 4px; }
+            input[type="range"] { height: 30px; }
+        }
 
         #asset-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; display: none; align-items: center; justify-content: center; }
         #asset-modal { width: 90%; max-height: 80%; background: #f0f0f0; border-radius: 12px; padding: 15px; display: flex; flex-direction: column; gap: 15px; }
@@ -82,8 +92,23 @@
 </div>
 
 <div id="bot-panel">
-    <div class="row"><label>サイズ</label><button class="prec-btn" onclick="adjS(-0.05)">-</button><input type="range" id="size-s" min="0.1" max="5" step="0.05"><button class="prec-btn" onclick="adjS(0.05)">+</button></div>
-    <div class="row"><label>接地</label><button class="prec-btn" onclick="adjO(-1)">-</button><input type="range" id="off-s" min="-100" max="100" step="1"><button class="prec-btn" onclick="adjO(1)">+</button></div>
+    <div class="row">
+        <div class="row-label">サイズ</div>
+        <div class="row-controls">
+            <button class="prec-btn" onclick="adjS(-0.05)">-</button>
+            <input type="range" id="size-s" min="0.1" max="5" step="0.05">
+            <button class="prec-btn" onclick="adjS(0.05)">+</button>
+        </div>
+    </div>
+    <div class="row">
+        <div class="row-label">接地</div>
+        <div class="row-controls">
+            <button class="prec-btn" onclick="adjO(-1)">-</button>
+            <input type="range" id="off-s" min="-100" max="100" step="1">
+            <button class="prec-btn" onclick="adjO(1)">+</button>
+        </div>
+    </div>
+
     <div class="tool-section">
         <div id="nudge-grid">
             <button class="btn-up" onclick="nudge(0,-0.1)">↑</button>
@@ -93,7 +118,7 @@
         </div>
         <div class="mode-box">
             <button class="save-btn" onclick="exportImage()">画像として保存</button>
-            <div style="display:flex; gap:3px;">
+            <div style="display:flex; gap:4px;">
                 <button class="data-btn btn-out" onclick="exportURL()">共有URL</button>
                 <button class="data-btn btn-clr" onclick="clearAll()">全消去</button>
             </div>
@@ -109,7 +134,6 @@
 <div id="export-overlay" onclick="this.style.display='none'"><img id="export-img" src=""></div>
 
 <script>
-// (JS部分は前回の v29.1.60 と同じですが、十字キーの grid-row 指定により配置を固定しています)
 const PRESETS = [
     { name: "HQ", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/HQ.png", s: 1.6, o: 1, gw: 2, gh: 2, ox: -0.1, oy: -0.2 },
     { name: "DOOM", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/DOOM.png", s: 1.6, o: -3, gw: 2, gh: 2, ox: -0.2, oy: 0 },
