@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.80</title>
+    <title>避難所レイアウト v29.1.82</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
         :root { --panel-h: 250px; --panel-w: 220px; }
@@ -14,8 +14,8 @@
         #top-panel { position: absolute; top: 0; width: 100%; height: 65px; background: rgba(255,255,255,0.9); border-bottom: 1px solid #ccc; display: flex; align-items: center; padding: 0 10px; box-sizing: border-box; z-index: 100; gap: 8px; }
         #cur-box { width: 50px; height: 50px; border: 2px solid #007aff; border-radius: 8px; background: #fff; background-size: contain; background-repeat: no-repeat; background-position: center; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #007aff; font-weight: bold; text-align: center; }
         
-        /* ギルメン名入力欄 */
-        #member-name-in { flex: 1; height: 40px; border: 1px solid #ccc; border-radius: 8px; padding: 0 10px; font-size: 14px; min-width: 0; }
+        #member-name-in { flex: 1; height: 40px; border: 1px solid #ccc; border-radius: 8px; padding: 0 10px; font-size: 14px; min-width: 0; outline: none; }
+        #member-name-in:focus { border-color: #007aff; background: #f0f7ff; }
 
         #open-list-btn { width: 50px; height: 50px; border-radius: 8px; border: 1px solid #ccc; background: #fff; font-size: 24px; color: #666; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; }
         .deselect-btn { height: 50px; padding: 0 8px; border-radius: 8px; border: 1px solid #ccc; background: #eee; color: #666; font-size: 11px; font-weight: bold; flex-shrink: 0; cursor: pointer; }
@@ -64,7 +64,7 @@
     <canvas id="cvs"></canvas>
     <div id="top-panel">
         <div id="cur-box"></div>
-        <input type="text" id="member-name-in" placeholder="ギルメン名を入力" oninput="updateMemberName(this.value)">
+        <input type="text" id="member-name-in" placeholder="ギルメン名" oninput="updateMemberName(this.value)">
         <button id="open-list-btn" onclick="toggleAssetModal(true)">＋</button>
         <button class="deselect-btn" onclick="deselect()">選択<br>解除</button>
         <button class="reload-btn" onclick="location.reload()">🔄</button>
@@ -102,7 +102,6 @@
 
 <div id="export-overlay" onclick="this.style.display='none'">
     <img id="export-img">
-    <p style="color:white; font-weight:bold; margin-top:10px;">長押しして保存してください</p>
 </div>
 
 <script>
@@ -130,9 +129,8 @@ function updateCurBox() {
     const box = document.getElementById('cur-box'); 
     const nameIn = document.getElementById('member-name-in');
     if(selIdx !== -1) {
-        const d = map[selIdx];
-        box.style.backgroundImage = `url(${assets[d.aIdx].src})`;
-        nameIn.value = d.mem || "";
+        box.style.backgroundImage = `url(${assets[map[selIdx].aIdx].src})`;
+        nameIn.value = map[selIdx].mem || "";
     } else if(activeAsset !== -1) {
         box.style.backgroundImage = `url(${assets[activeAsset].src})`;
         nameIn.value = "";
@@ -146,8 +144,7 @@ function updateMemberName(val) { if(selIdx !== -1) { map[selIdx].mem = val; save
 
 async function exportURL() {
     const exportMap = map.map(d => { const a = assets[d.aIdx]; const isPreset = (a.name !== null && a.name !== undefined); return { n: isPreset ? a.name : null, x: d.x, y: d.y, s: d.s, off: d.off, ox: d.ox, oy: d.oy, mem: d.mem, src: isPreset ? null : a.src }; });
-    const obj = { m: exportMap, l: lines };
-    const compressed = LZString.compressToEncodedURIComponent(JSON.stringify(obj));
+    const compressed = LZString.compressToEncodedURIComponent(JSON.stringify({ m: exportMap, l: lines }));
     const fullUrl = window.location.href.split('?')[0] + "?d=" + compressed;
     try {
         const res = await fetch(`https://is.gd/create.php?format=json&url=${encodeURIComponent(fullUrl)}`);
@@ -178,14 +175,31 @@ function render() {
         const w = T_W * d.s, h = (a.img.height/a.img.width) * w, anchor = toS(d.x + a.gw + d.ox, d.y + a.gh + d.oy); 
         ctx.drawImage(a.img, anchor.x - w / 2, anchor.y - h + d.off, w, h);
         
-        // ギルメン名表示
+        // ギルメン名表示（青枠の中央：黒背景+白字）
         if (d.mem) {
             ctx.save();
-            ctx.font = `bold ${14/cam.z}px sans-serif`;
+            const fontSize = 12/cam.z;
+            ctx.font = `bold ${fontSize}px sans-serif`;
+            // 占有タイルの中心座標を計算
+            const centerX = d.x + (a.gw / 2);
+            const centerY = d.y + (a.gh / 2);
+            const pos = toS(centerX, centerY);
+            
+            const txtW = ctx.measureText(d.mem).width;
+            const bgW = txtW + (8/cam.z);
+            const bgH = fontSize + (6/cam.z);
+            
+            // 黒背景の描画
+            ctx.fillStyle = "rgba(0,0,0,0.7)";
+            ctx.beginPath();
+            ctx.roundRect(pos.x - bgW/2, pos.y - bgH/2, bgW, bgH, 4/cam.z);
+            ctx.fill();
+            
+            // 白文字の描画
+            ctx.fillStyle = "#fff";
             ctx.textAlign = "center";
-            const ty = anchor.y - h + d.off - (8/cam.z);
-            ctx.strokeStyle = "white"; ctx.lineWidth = 4/cam.z; ctx.strokeText(d.mem, anchor.x, ty);
-            ctx.fillStyle = "#ff3b30"; ctx.fillText(d.mem, anchor.x, ty);
+            ctx.textBaseline = "middle";
+            ctx.fillText(d.mem, pos.x, pos.y);
             ctx.restore();
         }
 
@@ -270,7 +284,7 @@ function updatePanel() { if(selIdx!==-1){ document.getElementById('size-s').valu
 function adjS(v) { if(selIdx!==-1){ map[selIdx].s = parseFloat((map[selIdx].s+v).toFixed(2)); updatePanel(); save(); render(); } }
 function adjO(v) { if(selIdx!==-1){ map[selIdx].off+=v; updatePanel(); save(); render(); } }
 function nudge(dx,dy) { if(selIdx!==-1){ map[selIdx].ox=parseFloat((map[selIdx].ox+dx).toFixed(2)); map[selIdx].oy=parseFloat((map[selIdx].oy+dy).toFixed(2)); save(); render(); } }
-function clearAll() { if(confirm("配置をすべて消去しますか？")){ map=[]; lines=[]; selIdx=-1; lockedId=null; save(); render(); } }
+function clearAll() { if(confirm("配置をすべて消去しますか？")){ map=[]; lines=[]; selIdx=-1; lockedId=null; save(); updateCurBox(); render(); } }
 function exportImage() { deselect(); render(); document.getElementById('export-img').src = cvs.toDataURL(); document.getElementById('export-overlay').style.display='flex'; }
 function crop(img) { const c = document.createElement('canvas'), t = c.getContext('2d'); c.width = img.width; c.height = img.height; t.drawImage(img,0,0); const d = t.getImageData(0,0,c.width,c.height).data; let x1=c.width, y1=c.height, x2=0, y2=0; for(let y=0; y<c.height; y++) for(let x=0; x<c.width; x++) if(d[(y*c.width+x)*4+3]>10){ x1=Math.min(x1,x); y1=Math.min(y1,y); x2=Math.max(x2,x); y2=Math.max(y2,y); } const w = x2-x1+1, h = y2-y1+1, c2 = document.createElement('canvas'); c2.width = w; c2.height = h; c2.getContext('2d').drawImage(img,x1,y1,w,h,0,0,w,h); return c2.toDataURL(); }
 init();
