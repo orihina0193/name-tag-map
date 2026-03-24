@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.96</title>
+    <title>避難所レイアウト v29.1.95</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
         :root { --panel-h: 250px; --panel-w: 220px; }
@@ -87,40 +87,12 @@ const PRESETS = [
     { name: "ROCK2", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/ROCK2.png", s: 0.75, o: -5, gw: 1, gh: 1, ox: 0, oy: 0 }
 ];
 
-// --- 背景タイル設定 (URL修正) ---
-const FIELD_URLS = [
-    "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/field1.png",
-    "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/field2.png",
-    "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/field3.png",
-    "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/field4.png",
-    "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/field5.png"
-];
-let fieldImgs = [], tileData = [];
-// --------------------
-
 const cvs = document.getElementById('cvs'); const ctx = cvs.getContext('2d');
 const T_W = 64, T_H = 32;
 let cam = { x: 0, y: 0, z: 1 }, assets = [], map = [], lines = [], selIdx = -1, activeAsset = -1, mode = 'move';
 let drag = false, pinch = false, lockedId = null, penStart = null, penCurrent = null, lastT = {x: 0, y: 0}, lastDist = 0, tempAssetStore = -1;
 
-function init() { 
-    window.addEventListener('resize', resize); resize(); 
-    cam.x = cvs.width/2; cam.y = cvs.height/3; 
-
-    // 背景画像のロード
-    FIELD_URLS.forEach(url => { 
-        const img = new Image(); 
-        img.crossOrigin="anonymous"; 
-        img.onload = () => { render(); }; 
-        img.src = url; 
-        fieldImgs.push(img); 
-    });
-    // 範囲を広めにタイルを割り当て
-    for(let gx=-40; gx<=60; gx++) for(let gy=-40; gy<=60; gy++) tileData.push({gx, gy, i: Math.floor(Math.random()*5)});
-
-    loadPresets().then(() => { const params = new URLSearchParams(window.location.search); const urlData = params.get('d'); if (urlData) applyData(urlData); else load(); render(); }); setupEvents(); 
-}
-
+function init() { window.addEventListener('resize', resize); resize(); cam.x = cvs.width/2; cam.y = cvs.height/3; loadPresets().then(() => { const params = new URLSearchParams(window.location.search); const urlData = params.get('d'); if (urlData) applyData(urlData); else load(); render(); }); setupEvents(); }
 function toggleAssetModal(show) { document.getElementById('asset-overlay').style.display = show ? 'flex' : 'none'; }
 function addThumb(idx) { const d = document.createElement('div'); d.className = 'thumb'; d.style.backgroundImage = `url(${assets[idx].src})`; d.onclick = () => { activeAsset = idx; tempAssetStore = idx; selIdx = -1; lockedId = null; setMode('move'); updateCurBox(); toggleAssetModal(false); render(); }; document.getElementById('asset-grid').appendChild(d); }
 function updateCurBox() { const box = document.getElementById('cur-box'); const nameIn = document.getElementById('member-name-in'); if(selIdx !== -1) { box.style.backgroundImage = `url(${assets[map[selIdx].aIdx].src})`; nameIn.value = map[selIdx].mem || ""; } else if(activeAsset !== -1) { box.style.backgroundImage = `url(${assets[activeAsset].src})`; nameIn.value = ""; } else { box.style.backgroundImage = 'none'; nameIn.value = ""; } }
@@ -145,16 +117,6 @@ function isBlocked(gx, gy, gw, gh, ignoreId = null) {
 
 function render() {
     ctx.clearRect(0,0,cvs.width,cvs.height); ctx.save(); ctx.translate(cam.x, cam.y); ctx.scale(cam.z, cam.z);
-    
-    // 背景地面の描画
-    tileData.forEach(t => { 
-        const img = fieldImgs[t.i];
-        if(img && img.complete && img.naturalWidth !== 0){ 
-            const p = toS(t.gx, t.gy); 
-            ctx.drawImage(img, p.x - T_W/2, p.y, T_W, T_W); 
-        }
-    });
-
     ctx.strokeStyle = "rgba(0,0,0,0.08)"; ctx.lineWidth = 1/cam.z;
     for(let i=-20; i<=40; i++){ let s = toS(i,-20), e = toS(i,40); ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(e.x,e.y); ctx.stroke(); s = toS(-20,i); e = toS(40,i); ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(e.x,e.y); ctx.stroke(); }
     lines.forEach(l => { ctx.beginPath(); ctx.strokeStyle = "rgba(255,0,0,0.6)"; ctx.lineWidth = 4/cam.z; const s = toS(l.x1, l.y1), e = toS(l.x2, l.y2); ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke(); });
@@ -170,11 +132,13 @@ function render() {
             const fVal = baseFont * d.s; 
             const pVal = basePad * d.s;
             const rVal = baseRad * d.s;
+
             ctx.font = `bold ${fVal}px sans-serif`;
             const pos = toS(d.x + (a.gw / 2), d.y + (a.gh / 2));
             const txtW = ctx.measureText(d.mem).width;
             const bgW = txtW + (pVal * 2);
             const bgH = fVal + pVal;
+
             ctx.fillStyle = "rgba(0,0,0,0.7)";
             ctx.beginPath();
             ctx.roundRect(pos.x - bgW/2, pos.y - bgH/2, bgW, bgH, rVal);
