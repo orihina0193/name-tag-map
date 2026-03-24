@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.95</title>
+    <title>避難所レイアウト v29.1.97</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
         :root { --panel-h: 250px; --panel-w: 220px; }
@@ -92,7 +92,12 @@ const T_W = 64, T_H = 32;
 let cam = { x: 0, y: 0, z: 1 }, assets = [], map = [], lines = [], selIdx = -1, activeAsset = -1, mode = 'move';
 let drag = false, pinch = false, lockedId = null, penStart = null, penCurrent = null, lastT = {x: 0, y: 0}, lastDist = 0, tempAssetStore = -1;
 
-function init() { window.addEventListener('resize', resize); resize(); cam.x = cvs.width/2; cam.y = cvs.height/3; loadPresets().then(() => { const params = new URLSearchParams(window.location.search); const urlData = params.get('d'); if (urlData) applyData(urlData); else load(); render(); }); setupEvents(); }
+function init() { 
+    window.addEventListener('resize', resize); resize(); 
+    cam.x = cvs.width/2; cam.y = cvs.height/3; 
+    loadPresets().then(() => { const params = new URLSearchParams(window.location.search); const urlData = params.get('d'); if (urlData) applyData(urlData); else load(); render(); }); setupEvents(); 
+}
+
 function toggleAssetModal(show) { document.getElementById('asset-overlay').style.display = show ? 'flex' : 'none'; }
 function addThumb(idx) { const d = document.createElement('div'); d.className = 'thumb'; d.style.backgroundImage = `url(${assets[idx].src})`; d.onclick = () => { activeAsset = idx; tempAssetStore = idx; selIdx = -1; lockedId = null; setMode('move'); updateCurBox(); toggleAssetModal(false); render(); }; document.getElementById('asset-grid').appendChild(d); }
 function updateCurBox() { const box = document.getElementById('cur-box'); const nameIn = document.getElementById('member-name-in'); if(selIdx !== -1) { box.style.backgroundImage = `url(${assets[map[selIdx].aIdx].src})`; nameIn.value = map[selIdx].mem || ""; } else if(activeAsset !== -1) { box.style.backgroundImage = `url(${assets[activeAsset].src})`; nameIn.value = ""; } else { box.style.backgroundImage = 'none'; nameIn.value = ""; } }
@@ -121,41 +126,47 @@ function render() {
     for(let i=-20; i<=40; i++){ let s = toS(i,-20), e = toS(i,40); ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(e.x,e.y); ctx.stroke(); s = toS(-20,i); e = toS(40,i); ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(e.x,e.y); ctx.stroke(); }
     lines.forEach(l => { ctx.beginPath(); ctx.strokeStyle = "rgba(255,0,0,0.6)"; ctx.lineWidth = 4/cam.z; const s = toS(l.x1, l.y1), e = toS(l.x2, l.y2); ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke(); });
     
-    map.sort((a,b)=>(Math.round(a.x)+Math.round(a.y))-(Math.round(b.x)+Math.round(b.y))).forEach((d, i) => {
+    // 描画順序をソート
+    const sorted = [...map].sort((a,b)=>(Math.round(a.x)+Math.round(a.y))-(Math.round(b.x)+Math.round(b.y)));
+    
+    // --- 第一パス: すべての建物を描画 ---
+    sorted.forEach((d, i) => {
         const a = assets[d.aIdx]; if(!a) return; 
         const w = T_W * d.s, h = (a.img.height/a.img.width) * w, anchor = toS(d.x + a.gw + d.ox, d.y + a.gh + d.oy); 
         ctx.drawImage(a.img, anchor.x - w / 2, anchor.y - h + d.off, w, h);
         
-        if (d.mem) {
-            ctx.save();
-            const baseFont = 9.5, basePad = 3.2, baseRad = 2.2;
-            const fVal = baseFont * d.s; 
-            const pVal = basePad * d.s;
-            const rVal = baseRad * d.s;
-
-            ctx.font = `bold ${fVal}px sans-serif`;
-            const pos = toS(d.x + (a.gw / 2), d.y + (a.gh / 2));
-            const txtW = ctx.measureText(d.mem).width;
-            const bgW = txtW + (pVal * 2);
-            const bgH = fVal + pVal;
-
-            ctx.fillStyle = "rgba(0,0,0,0.7)";
-            ctx.beginPath();
-            ctx.roundRect(pos.x - bgW/2, pos.y - bgH/2, bgW, bgH, rVal);
-            ctx.fill();
-            ctx.fillStyle = "#fff";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText(d.mem, pos.x, pos.y);
-            ctx.restore();
-        }
-
-        if(lockedId === d.id || (activeAsset === -1 && selIdx === i)) {
+        // 選択枠（建物に付随）
+        if(lockedId === d.id || (activeAsset === -1 && selIdx !== -1 && map[selIdx].id === d.id)) {
             ctx.strokeStyle = "#007aff"; ctx.lineWidth = (lockedId ? 1 : 3)/cam.z;
             const gx = Math.round(d.x), gy = Math.round(d.y), pS = toS(gx+a.gw, gy+a.gh), pW = toS(gx, gy+a.gh), pE = toS(gx+a.gw, gy), pN = toS(gx, gy); 
             ctx.beginPath(); ctx.moveTo(pS.x,pS.y); ctx.lineTo(pW.x,pW.y); ctx.lineTo(pN.x,pN.y); ctx.lineTo(pE.x,pE.y); ctx.closePath(); ctx.stroke(); 
         }
     });
+
+    // --- 第二パス: 全てのネームタグを最前面に描画 ---
+    // ここで d.x, d.y を参照するので、建物が移動すればタグも追従します
+    sorted.forEach((d) => {
+        if (!d.mem) return;
+        const a = assets[d.aIdx]; if(!a) return; 
+        ctx.save();
+        const baseFont = 9.5, basePad = 3.2, baseRad = 2.2;
+        const fVal = baseFont * d.s, pVal = basePad * d.s, rVal = baseRad * d.s;
+        ctx.font = `bold ${fVal}px sans-serif`;
+        // タグの位置を建物の中心座標（d.x, d.yベース）で計算
+        const pos = toS(d.x + (a.gw / 2), d.y + (a.gh / 2));
+        const txtW = ctx.measureText(d.mem).width;
+        const bgW = txtW + (pVal * 2), bgH = fVal + pVal;
+        ctx.fillStyle = "rgba(0,0,0,0.7)";
+        ctx.beginPath();
+        ctx.roundRect(pos.x - bgW/2, pos.y - bgH/2, bgW, bgH, rVal);
+        ctx.fill();
+        ctx.fillStyle = "#fff";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(d.mem, pos.x, pos.y);
+        ctx.restore();
+    });
+
     if(mode === 'pen' && penStart && penCurrent) {
         ctx.beginPath(); ctx.setLineDash([6/cam.z, 3/cam.z]); ctx.strokeStyle = "rgba(255, 0, 0, 0.8)"; ctx.lineWidth = 2/cam.z;
         const s = toS(penStart.x, penStart.y), e = toS(penCurrent.x, penCurrent.y); ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke();
