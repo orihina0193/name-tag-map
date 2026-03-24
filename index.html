@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.98</title>
+    <title>避難所レイアウト v29.1.99</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
         :root { --panel-h: 250px; --panel-w: 220px; }
@@ -11,25 +11,28 @@
         #main-container { flex: 1; position: relative; overflow: hidden; }
         canvas { display: block; background: #f0f0f0; width: 100%; height: 100%; cursor: crosshair; }
         
+        /* 上部パネル: 入力欄を最大化 */
         #top-panel { position: absolute; top: 0; width: 100%; height: 65px; background: rgba(255,255,255,0.9); border-bottom: 1px solid #ccc; display: flex; align-items: center; padding: 0 10px; box-sizing: border-box; z-index: 100; gap: 8px; }
-        #cur-box { width: 50px; height: 50px; border: 2px solid #007aff; border-radius: 8px; background: #fff; background-size: contain; background-repeat: no-repeat; background-position: center; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #007aff; font-weight: bold; text-align: center; }
-        #member-name-in { flex: 1; height: 40px; border: 1px solid #ccc; border-radius: 8px; padding: 0 10px; font-size: 14px; min-width: 0; outline: none; }
         
-        /* ボタン群 */
+        /* 選択中ボックス自体を解除ボタンに */
+        #cur-box { width: 50px; height: 50px; border: 2px solid #007aff; border-radius: 8px; background: #fff; background-size: contain; background-repeat: no-repeat; background-position: center; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #007aff; font-weight: bold; text-align: center; cursor: pointer; position: relative; }
+        #cur-box::after { content: "解除"; position: absolute; bottom: -2px; right: -2px; background: #007aff; color: #fff; font-size: 8px; padding: 1px 3px; border-radius: 4px; display: none; }
+        #cur-box.has-item::after { display: block; }
+
+        /* 名前入力欄をフレックスで広げる */
+        #member-name-in { flex: 1; height: 45px; border: 1px solid #ccc; border-radius: 8px; padding: 0 12px; font-size: 16px; min-width: 0; outline: none; background: #fff; }
+        
         .top-btn { width: 44px; height: 50px; border-radius: 8px; border: 1px solid #ccc; background: #fff; font-size: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; }
-        .deselect-btn { height: 50px; padding: 0 8px; border-radius: 8px; border: 1px solid #ccc; background: #eee; color: #666; font-size: 11px; font-weight: bold; flex-shrink: 0; cursor: pointer; }
-        .reload-btn { height: 50px; width: 44px; margin-left: auto; border-radius: 8px; border: 1px solid #ff9500; background: #fff; color: #ff9500; font-size: 20px; font-weight: bold; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; }
+        .reload-btn { height: 50px; width: 44px; border-radius: 8px; border: 1px solid #ff9500; background: #fff; color: #ff9500; font-size: 20px; font-weight: bold; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; }
 
         /* モーダル共通設定 */
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; display: none; align-items: center; justify-content: center; }
         .modal { width: 85%; max-height: 70%; background: #f8f9fa; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
         .modal-title { font-size: 16px; font-weight: bold; color: #333; border-bottom: 2px solid #007aff; padding-bottom: 5px; margin-bottom: 5px; }
         
-        /* メンバーリスト専用 */
         #mem-list { overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
         .mem-item { padding: 12px; background: #fff; border: 1px solid #eee; border-radius: 8px; font-size: 14px; color: #333; display: flex; justify-content: space-between; align-items: center; }
         .mem-item:active { background: #e0f0ff; }
-        .mem-go { color: #007aff; font-weight: bold; font-size: 12px; }
 
         #bot-panel { background: rgba(255,255,255,0.98); border-top: 1px solid #ccc; padding: 8px 10px; box-sizing: border-box; z-index: 100; display: flex; flex-direction: column; gap: 6px; height: var(--panel-h); }
         @media (orientation: landscape) { :root { --panel-w: 220px; } body { flex-direction: row; } #bot-panel { width: var(--panel-w); height: 100%; border-top: none; border-left: 1px solid #ccc; padding: 10px 5px; overflow-x: hidden; overflow-y: auto; flex-shrink: 0; gap: 8px; } .tool-section { flex-direction: column; gap: 6px; align-items: center; } .row { width: 100%; gap: 4px; } input[type="range"] { min-width: 0; flex: 1; } }
@@ -59,12 +62,11 @@
 <div id="main-container">
     <canvas id="cvs"></canvas>
     <div id="top-panel">
-        <div id="cur-box"></div>
-        <input type="text" id="member-name-in" placeholder="ギルメン名" oninput="updateMemberName(this.value)">
-        <button class="top-btn" onclick="openMemberList()">👥</button>
-        <button class="top-btn" onclick="toggleAssetModal(true)">＋</button>
-        <button class="deselect-btn" onclick="deselect()">選択<br>解除</button>
-        <button class="reload-btn" onclick="location.reload()">🔄</button>
+        <div id="cur-box" onclick="deselect()" title="選択解除"></div>
+        <input type="text" id="member-name-in" placeholder="ギルメン名を入力" oninput="updateMemberName(this.value)">
+        <button class="top-btn" onclick="openMemberList()" title="名簿">👥</button>
+        <button class="top-btn" onclick="toggleAssetModal(true)" title="素材追加">＋</button>
+        <button class="reload-btn" onclick="location.reload()" title="リセット">🔄</button>
     </div>
 </div>
 
@@ -124,19 +126,16 @@ function init() {
     loadPresets().then(() => { const params = new URLSearchParams(window.location.search); const urlData = params.get('d'); if (urlData) applyData(urlData); else load(); render(); }); setupEvents(); 
 }
 
-// メンバーリスト機能
 function openMemberList() {
     const listCont = document.getElementById('mem-list');
     listCont.innerHTML = "";
-    // 名前がある建物だけ抽出
     const members = map.filter(d => d.mem && d.mem.trim() !== "");
     if(members.length === 0) { listCont.innerHTML = "<div style='text-align:center; padding:20px; color:#999;'>まだメンバーが配置されていません</div>"; }
     else {
-        // 名前順にソート
         members.sort((a,b) => a.mem.localeCompare(b.mem)).forEach(m => {
             const div = document.createElement('div');
             div.className = 'mem-item';
-            div.innerHTML = `<span>${m.mem}</span><span class="mem-go">表示 ▶</span>`;
+            div.innerHTML = `<span>${m.mem}</span><span style="color:#007aff; font-weight:bold; font-size:12px;">表示 ▶</span>`;
             div.onclick = () => { jumpToMember(m.id); document.getElementById('mem-overlay').style.display='none'; };
             listCont.appendChild(div);
         });
@@ -147,7 +146,7 @@ function openMemberList() {
 function jumpToMember(id) {
     const d = map.find(item => item.id === id);
     if(!d) return;
-    const pos = toS(d.x + 1, d.y + 1); // 建物の中心付近
+    const pos = toS(d.x + 1, d.y + 1);
     cam.x = cvs.width/2 - pos.x * cam.z;
     cam.y = cvs.height/2 - pos.y * cam.z;
     selIdx = map.findIndex(item => item.id === id);
@@ -157,7 +156,25 @@ function jumpToMember(id) {
 
 function toggleAssetModal(show) { document.getElementById('asset-overlay').style.display = show ? 'flex' : 'none'; }
 function addThumb(idx) { const d = document.createElement('div'); d.className = 'thumb'; d.style.backgroundImage = `url(${assets[idx].src})`; d.onclick = () => { activeAsset = idx; tempAssetStore = idx; selIdx = -1; lockedId = null; setMode('move'); updateCurBox(); toggleAssetModal(false); render(); }; document.getElementById('asset-grid').appendChild(d); }
-function updateCurBox() { const box = document.getElementById('cur-box'); const nameIn = document.getElementById('member-name-in'); if(selIdx !== -1) { box.style.backgroundImage = `url(${assets[map[selIdx].aIdx].src})`; nameIn.value = map[selIdx].mem || ""; } else if(activeAsset !== -1) { box.style.backgroundImage = `url(${assets[activeAsset].src})`; nameIn.value = ""; } else { box.style.backgroundImage = 'none'; nameIn.value = ""; } }
+
+function updateCurBox() { 
+    const box = document.getElementById('cur-box'); 
+    const nameIn = document.getElementById('member-name-in'); 
+    if(selIdx !== -1) { 
+        box.style.backgroundImage = `url(${assets[map[selIdx].aIdx].src})`; 
+        box.classList.add('has-item');
+        nameIn.value = map[selIdx].mem || ""; 
+    } else if(activeAsset !== -1) { 
+        box.style.backgroundImage = `url(${assets[activeAsset].src})`; 
+        box.classList.add('has-item');
+        nameIn.value = ""; 
+    } else { 
+        box.style.backgroundImage = 'none'; 
+        box.classList.remove('has-item');
+        nameIn.value = ""; 
+    } 
+}
+
 function updateMemberName(val) { if(selIdx !== -1) { map[selIdx].mem = val; save(); render(); } }
 
 async function exportURL() {
