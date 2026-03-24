@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.1.95</title>
+    <title>避難所レイアウト v29.2.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
         :root { --panel-h: 250px; --panel-w: 220px; }
@@ -76,6 +76,7 @@
 <div id="export-overlay" onclick="this.style.display='none'"><img id="export-img"></div>
 
 <script>
+// プリセット設定（floor.pngに対応）
 const PRESETS = [
     { name: "HQ", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/HQ.png", s: 1.6, o: 1, gw: 2, gh: 2, ox: -0.1, oy: -0.2 },
     { name: "DOOM", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/DOOM.png", s: 1.6, o: -3, gw: 2, gh: 2, ox: -0.2, oy: 0 },
@@ -128,6 +129,7 @@ function render() {
         
         if (d.mem) {
             ctx.save();
+            // イクミ・カスタム数値
             const baseFont = 9.5, basePad = 3.2, baseRad = 2.2;
             const fVal = baseFont * d.s; 
             const pVal = basePad * d.s;
