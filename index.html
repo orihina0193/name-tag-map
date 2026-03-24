@@ -87,13 +87,13 @@ const PRESETS = [
     { name: "ROCK2", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/ROCK2.png", s: 0.75, o: -5, gw: 1, gh: 1, ox: 0, oy: 0 }
 ];
 
-// --- 背景タイル設定 ---
+// --- 背景タイル設定 (URL修正) ---
 const FIELD_URLS = [
-    "https://github.com/orihina0193/map-tool/blob/main/img/field1.png?raw=true",
-    "https://github.com/orihina0193/map-tool/blob/main/img/field2.png?raw=true",
-    "https://github.com/orihina0193/map-tool/blob/main/img/field3.png?raw=true",
-    "https://github.com/orihina0193/map-tool/blob/main/img/field4.png?raw=true",
-    "https://github.com/orihina0193/map-tool/blob/main/img/field5.png?raw=true"
+    "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/field1.png",
+    "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/field2.png",
+    "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/field3.png",
+    "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/field4.png",
+    "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/field5.png"
 ];
 let fieldImgs = [], tileData = [];
 // --------------------
@@ -107,15 +107,16 @@ function init() {
     window.addEventListener('resize', resize); resize(); 
     cam.x = cvs.width/2; cam.y = cvs.height/3; 
 
-    // タイル画像の準備
+    // 背景画像のロード
     FIELD_URLS.forEach(url => { 
         const img = new Image(); 
         img.crossOrigin="anonymous"; 
+        img.onload = () => { render(); }; 
         img.src = url; 
-        img.onload = () => { render(); }; // 読み込み終わったら再描画
         fieldImgs.push(img); 
     });
-    for(let gx=-30; gx<=50; gx++) for(let gy=-30; gy<=50; gy++) tileData.push({gx, gy, i: Math.floor(Math.random()*5)});
+    // 範囲を広めにタイルを割り当て
+    for(let gx=-40; gx<=60; gx++) for(let gy=-40; gy<=60; gy++) tileData.push({gx, gy, i: Math.floor(Math.random()*5)});
 
     loadPresets().then(() => { const params = new URLSearchParams(window.location.search); const urlData = params.get('d'); if (urlData) applyData(urlData); else load(); render(); }); setupEvents(); 
 }
@@ -145,11 +146,12 @@ function isBlocked(gx, gy, gw, gh, ignoreId = null) {
 function render() {
     ctx.clearRect(0,0,cvs.width,cvs.height); ctx.save(); ctx.translate(cam.x, cam.y); ctx.scale(cam.z, cam.z);
     
-    // 背景タイルの描画（読み込み完了しているもののみ）
+    // 背景地面の描画
     tileData.forEach(t => { 
-        if(fieldImgs[t.i] && fieldImgs[t.i].complete && fieldImgs[t.i].naturalWidth !== 0){ 
+        const img = fieldImgs[t.i];
+        if(img && img.complete && img.naturalWidth !== 0){ 
             const p = toS(t.gx, t.gy); 
-            ctx.drawImage(fieldImgs[t.i], p.x - T_W/2, p.y, T_W, T_W); 
+            ctx.drawImage(img, p.x - T_W/2, p.y, T_W, T_W); 
         }
     });
 
