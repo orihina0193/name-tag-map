@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.3.0</title>
+    <title>避難所レイアウト v29.3.2</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
         :root { --panel-h: 250px; --panel-w: 220px; }
@@ -14,13 +14,12 @@
         /* 右上固定ガイドボタン */
         #guide-trigger { position: absolute; top: 75px; right: 15px; width: 40px; height: 40px; background: rgba(0,122,255,0.9); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 20px; z-index: 500; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); border: 2px solid #fff; }
         #guide-trigger.active { background: #ff3b30; }
-
-        /* ガイド用オーバーレイ */
         #guide-msg-box { position: absolute; top: 125px; left: 50%; transform: translateX(-50%); width: 80%; background: rgba(0,0,0,0.85); color: white; padding: 15px; border-radius: 12px; font-size: 14px; line-height: 1.5; z-index: 2500; display: none; text-align: center; pointer-events: none; }
 
         /* 上部パネル */
         #top-panel { position: absolute; top: 0; width: 100%; height: 65px; background: rgba(255,255,255,0.9); border-bottom: 1px solid #ccc; display: flex; align-items: center; padding: 0 10px; box-sizing: border-box; z-index: 100; gap: 8px; }
         #cur-box { width: 50px; height: 50px; border: 2px solid #007aff; border-radius: 8px; background: #fff; background-size: contain; background-repeat: no-repeat; background-position: center; flex-shrink: 0; cursor: pointer; position: relative; }
+        #cur-box.has-item::after { content: "解除"; position: absolute; bottom: -2px; right: -2px; background: #007aff; color: #fff; font-size: 8px; padding: 1px 3px; border-radius: 4px; }
         #member-name-in { flex: 1; height: 45px; border: 1px solid #ccc; border-radius: 8px; padding: 0 12px; font-size: 16px; min-width: 0; outline: none; background: #fff; }
         .top-btn { width: 44px; height: 50px; border-radius: 8px; border: 1px solid #ccc; background: #fff; font-size: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; }
         .reload-btn { height: 50px; width: 44px; border-radius: 8px; border: 1px solid #ff9500; background: #fff; color: #ff9500; font-size: 20px; font-weight: bold; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; }
@@ -28,29 +27,30 @@
         /* 下部パネル */
         #bot-panel { background: rgba(255,255,255,0.98); border-top: 1px solid #ccc; padding: 8px 10px; box-sizing: border-box; z-index: 100; display: flex; flex-direction: column; gap: 6px; height: var(--panel-h); }
         .row { display: flex; align-items: center; gap: 5px; }
-        input[type="range"] { flex: 1; height: 32px; }
-        .prec-btn { width: 22px; height: 38px; font-size: 18px; border: 1px solid #dcdcdc; background: #fff; border-radius: 5px; color: #007aff; }
+        .row label { font-size: 10px; font-weight: bold; width: 12px; flex-shrink: 0; text-align: center; }
+        input[type="range"] { flex: 1; height: 32px; cursor: pointer; }
+        .prec-btn { width: 22px; height: 38px; font-size: 18px; border: 1px solid #dcdcdc; background: #fff; border-radius: 5px; color: #007aff; cursor: pointer; flex-shrink: 0; }
         .tool-section { display: flex; justify-content: space-between; gap: 5px; width: 100%; }
         #nudge-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; width: 105px; flex-shrink: 0; }
         #nudge-grid button { height: 36px; font-size: 18px; border: 1px solid #ccc; background: #fff; border-radius: 6px; color: #007aff; }
-        .mode-box { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+        .mode-box { flex: 1; display: flex; flex-direction: column; gap: 4px; width: 100%; }
         .mode-row { display: flex; gap: 2px; }
         .mode-row button { flex: 1; height: 30px; font-size: 9px; font-weight: bold; border-radius: 5px; border: 1px solid #ccc; background: #fff; }
         .mode-row button.active { background: #007aff; color: #fff; }
-        .data-btn { flex: 1; height: 30px; font-size: 10px; font-weight: bold; border-radius: 5px; border: none; color: white; }
+        .data-btn { flex: 1; height: 30px; font-size: 10px; font-weight: bold; border-radius: 5px; border: none; color: white; cursor: pointer; }
         .btn-out { background: #5856d6; }
         .btn-clr { background: #ff3b30; }
-        .save-btn { height: 34px; font-size: 11px; background: #34c759; border: none; border-radius: 6px; color: white; font-weight: bold; width: 100%; }
+        .save-btn { height: 34px; font-size: 11px; background: #34c759; border: none; border-radius: 6px; color: white; font-weight: bold; width: 100%; cursor: pointer; }
 
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; display: none; align-items: center; justify-content: center; }
         .modal { width: 85%; max-height: 70%; background: #f8f9fa; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
+        .modal-title { font-size: 16px; font-weight: bold; color: #333; border-bottom: 2px solid #007aff; padding-bottom: 5px; }
+        #mem-list { overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+        .mem-item { padding: 12px; background: #fff; border: 1px solid #eee; border-radius: 8px; font-size: 14px; display: flex; justify-content: space-between; align-items: center; }
         #asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 10px; overflow-y: auto; }
-        .thumb { width: 60px; height: 60px; border-radius: 8px; border: 2px solid #ccc; background-size: contain; background-repeat: no-repeat; background-position: center; background-color: #fff; }
+        .thumb { width: 60px; height: 60px; border-radius: 8px; border: 2px solid #ccc; background-size: contain; background-repeat: no-repeat; background-position: center; background-color: #fff; cursor: pointer; }
         #export-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 3000; display: none; flex-direction: column; align-items: center; justify-content: center; }
         #export-img { max-width: 90%; max-height: 75%; border: 2px solid #fff; }
-
-        /* ガイドモード中のハイライト */
-        .guide-highlight { outline: 3px solid #ff3b30 !important; outline-offset: -3px; position: relative; }
     </style>
 </head>
 <body>
@@ -58,39 +58,31 @@
     <canvas id="cvs"></canvas>
     <div id="guide-trigger" onclick="toggleGuideMode()">?</div>
     <div id="guide-msg-box">ガイドモード：ボタンをタップして説明を表示</div>
-
     <div id="top-panel">
-        <div id="cur-box" onclick="handleGuideClick('選択解除', event) || deselect()"></div>
+        <div id="cur-box" onclick="handleGuideClick('選択解除', event) || deselect()" title="選択解除"></div>
         <input type="text" id="member-name-in" placeholder="ギルメン名を入力" oninput="updateMemberName(this.value)" onclick="handleGuideClick('ギルメン名', event)">
-        <button class="top-btn" onclick="handleGuideClick('名簿', event) || openMemberList()">👥</button>
-        <button class="top-btn" onclick="handleGuideClick('素材追加', event) || toggleAssetModal(true)">＋</button>
-        <button class="reload-btn" onclick="handleGuideClick('リセット', event) || location.reload()">🔄</button>
+        <button class="top-btn" onclick="handleGuideClick('名簿', event) || openMemberList()" title="名簿">👥</button>
+        <button class="top-btn" onclick="handleGuideClick('素材追加', event) || toggleAssetModal(true)" title="素材追加">＋</button>
+        <button class="reload-btn" onclick="handleGuideClick('リセット', event) || location.reload()" title="リセット">🔄</button>
     </div>
 </div>
 
+<div id="mem-overlay" class="overlay" onclick="if(event.target==this)this.style.display='none'"><div class="modal"><div class="modal-title">配置済みメンバー一覧</div><div id="mem-list"></div></div></div>
+<div id="asset-overlay" class="overlay" onclick="if(event.target==this)toggleAssetModal(false)"><div class="modal"><div class="modal-title">建物素材</div><div id="asset-grid"><label style="width:60px; height:60px; border:2px dashed #bbb; border-radius:8px; display:flex; justify-content:center; align-items:center; font-size:24px; color:#999; background:#fff; cursor:pointer;"><input type="file" id="img-in" hidden accept="image/*" multiple onchange="handleFiles(this.files)">📁</label></div></div></div>
+
 <div id="bot-panel">
-    <div class="row" onclick="handleGuideClick('サイズ調整', event)"><button class="prec-btn" onclick="adjS(-0.05)">-</button><input type="range" id="size-s" min="0.1" max="5" step="0.05"><button class="prec-btn" onclick="adjS(0.05)">+</button></div>
-    <div class="row" onclick="handleGuideClick('接地調整', event)"><button class="prec-btn" onclick="adjO(-1)">-</button><input type="range" id="off-s" min="-100" max="100" step="1"><button class="prec-btn" onclick="adjO(1)">+</button></div>
+    <div class="row" onclick="handleGuideClick('サイズ調整', event)"><label>サイズ</label><button class="prec-btn" onclick="adjS(-0.05)">-</button><input type="range" id="size-s" min="0.1" max="5" step="0.05"><button class="prec-btn" onclick="adjS(0.05)">+</button></div>
+    <div class="row" onclick="handleGuideClick('接地調整', event)"><label>接地</label><button class="prec-btn" onclick="adjO(-1)">-</button><input type="range" id="off-s" min="-100" max="100" step="1"><button class="prec-btn" onclick="adjO(1)">+</button></div>
     <div class="tool-section">
         <div id="nudge-grid" onclick="handleGuideClick('微調整', event)"><button style="grid-column:2" onclick="nudge(0,-0.1)">↑</button><button style="grid-column:1" onclick="nudge(-0.1,0)">←</button><button style="grid-column:2" onclick="nudge(0,0.1)">↓</button><button style="grid-column:3" onclick="nudge(0.1,0)">→</button></div>
         <div class="mode-box">
             <button class="save-btn" onclick="handleGuideClick('画像保存', event) || exportImage()">画像として保存</button>
-            <div style="display:flex; gap:3px;">
-                <button class="data-btn btn-out" onclick="handleGuideClick('共有URL', event) || exportURL()">共有URL</button>
-                <button class="data-btn btn-clr" onclick="handleGuideClick('全消去', event) || clearAll()">全消去</button>
-            </div>
-            <div class="mode-row" onclick="handleGuideClick('モード切替', event)">
-                <button id="m-move" onclick="setMode('move')">移動</button>
-                <button id="m-pen" onclick="setMode('pen')">ペン</button>
-                <button id="m-p-erase" onclick="setMode('p-erase')">線消</button>
-                <button id="m-erase" onclick="setMode('erase')">建物消</button>
-            </div>
+            <div style="display:flex; gap:3px;"><button class="data-btn btn-out" onclick="handleGuideClick('共有URL', event) || exportURL()">共有URL</button><button class="data-btn btn-clr" onclick="handleGuideClick('全消去', event) || clearAll()">全消去</button></div>
+            <div class="mode-row" onclick="handleGuideClick('モード切替', event)"><button id="m-move" onclick="setMode('move')">移動</button><button id="m-pen" onclick="setMode('pen')">ペン</button><button id="m-p-erase" onclick="setMode('p-erase')">線消</button><button id="m-erase" onclick="setMode('erase')">建物消</button></div>
         </div>
     </div>
 </div>
 
-<div id="mem-overlay" class="overlay" onclick="if(event.target==this)this.style.display='none'"><div class="modal"><div id="mem-list"></div></div></div>
-<div id="asset-overlay" class="overlay" onclick="if(event.target==this)toggleAssetModal(false)"><div class="modal"><div id="asset-grid"><label style="width:60px; height:60px; border:2px dashed #bbb; border-radius:8px; display:flex; justify-content:center; align-items:center; font-size:24px; color:#999; background:#fff; cursor:pointer;"><input type="file" id="img-in" hidden accept="image/*" multiple onchange="handleFiles(this.files)">📁</label></div></div></div>
 <div id="export-overlay" onclick="this.style.display='none'"><img id="export-img"></div>
 
 <script>
@@ -98,14 +90,14 @@ let guideMode = false;
 const GUIDE_TEXT = {
     '選択解除': '現在選んでいる建物を解除します。',
     'ギルメン名': '配置した建物に名前を付けます。黒背景のネームタグが表示されます。',
-    '名簿': '配置済みのメンバーを一覧表示します。タップするとその場所へジャンプします。',
-    '素材追加': '建物の追加。フォルダアイコンからスマホ内の画像も取り込めます。',
+    '名簿': '配置済みのメンバーを一覧表示します。名前をタップするとその場所へジャンプします。',
+    '素材追加': '建物の追加。フォルダアイコンから画像も取り込めます。',
     'リセット': '画面をリロードして最初からやり直します。',
     'サイズ調整': '建物の大きさを変えます。',
     '接地調整': '建物の重なり順や、マスの接地位置を上下に微調整します。',
     '微調整': '矢印ボタンで、建物をドット単位で細かく動かします。',
-    '画像保存': '白い背景を付けた状態で保存します。そのままチャットに貼っても真っ黒になりません。',
-    '共有URL': '今の配置をURLにしてコピーします。ギルメンに送れば同じ画面が開けます。',
+    '画像保存': '現在見えているキャンバスの画像を保存します。',
+    '共有URL': '今の状態をURLにしてコピーします。他の人への共有や 編集の続きができます。',
     '全消去': 'すべての建物と線を消して空にします。',
     'モード切替': '移動、ペン（赤い線）、消しゴムのモードを切り替えます。'
 };
@@ -114,22 +106,18 @@ function toggleGuideMode() {
     guideMode = !guideMode;
     const btn = document.getElementById('guide-trigger');
     const msg = document.getElementById('guide-msg-box');
-    btn.classList.toggle('active');
-    btn.innerText = guideMode ? '×' : '?';
+    btn.classList.toggle('active'); btn.innerText = guideMode ? '×' : '?';
     msg.style.display = guideMode ? 'block' : 'none';
     msg.innerText = 'ガイドモード：ボタンをタップして説明を表示';
 }
 
 function handleGuideClick(key, event) {
     if (!guideMode) return false;
-    event.stopPropagation();
-    event.preventDefault();
-    const msg = document.getElementById('guide-msg-box');
-    msg.innerText = GUIDE_TEXT[key];
+    event.stopPropagation(); event.preventDefault();
+    document.getElementById('guide-msg-box').innerText = GUIDE_TEXT[key];
     return true;
 }
 
-// 既存の基本ロジック
 const PRESETS = [
     { name: "HQ", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/HQ.png", s: 1.6, o: 1, gw: 2, gh: 2, ox: -0.1, oy: -0.2 },
     { name: "DOOM", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/DOOM.png", s: 1.6, o: -3, gw: 2, gh: 2, ox: -0.2, oy: 0 },
@@ -144,97 +132,40 @@ const PRESETS = [
 const cvs = document.getElementById('cvs'); const ctx = cvs.getContext('2d');
 const T_W = 64, T_H = 32;
 let cam = { x: 0, y: 0, z: 1 }, assets = [], map = [], lines = [], selIdx = -1, activeAsset = -1, mode = 'move';
-let drag = false, pinch = false, lockedId = null, penStart = null, penCurrent = null, lastT = {x: 0, y: 0}, lastDist = 0;
+let drag = false, pinch = false, lockedId = null, penStart = null, penCurrent = null, lastT = {x: 0, y: 0}, lastDist = 0, tempAssetStore = -1;
 
-function init() { 
-    window.addEventListener('resize', resize); resize(); 
-    cam.x = cvs.width/2; cam.y = cvs.height/3; 
-    loadPresets().then(() => { const params = new URLSearchParams(window.location.search); const urlData = params.get('d'); if (urlData) applyData(urlData); else load(); render(); }); setupEvents(); 
-}
-
-function zoom(scaleChange, centerX, centerY) {
-    const newZ = Math.min(Math.max(cam.z * scaleChange, 0.1), 5);
-    const ratio = newZ / cam.z;
-    cam.x = centerX - (centerX - cam.x) * ratio;
-    cam.y = centerY - (centerY - cam.y) * ratio;
-    cam.z = newZ;
-}
-
-function drawTerritory(gx, gy, range, color) {
-    ctx.fillStyle = color; ctx.beginPath();
-    const p1 = toS(gx - range, gy - range), p2 = toS(gx + range + 1, gy - range), p3 = toS(gx + range + 1, gy + range + 1), p4 = toS(gx - range, gy + range + 1);
-    ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.lineTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y); ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = "rgba(0,122,255,0.3)"; ctx.lineWidth = 1/cam.z; ctx.stroke();
-}
+function init() { window.addEventListener('resize', resize); resize(); cam.x = cvs.width/2; cam.y = cvs.height/3; loadPresets().then(() => { const params = new URLSearchParams(window.location.search); const urlData = params.get('d'); if (urlData) applyData(urlData); else load(); render(); }); setupEvents(); }
+function zoom(scaleChange, centerX, centerY) { const newZ = Math.min(Math.max(cam.z * scaleChange, 0.1), 5); const ratio = newZ / cam.z; cam.x = centerX - (centerX - cam.x) * ratio; cam.y = centerY - (centerY - cam.y) * ratio; cam.z = newZ; }
+function drawTerritory(gx, gy, range, color) { ctx.fillStyle = color; ctx.beginPath(); const p1 = toS(gx - range, gy - range), p2 = toS(gx + range + 1, gy - range), p3 = toS(gx + range + 1, gy + range + 1), p4 = toS(gx - range, gy + range + 1); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.lineTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y); ctx.closePath(); ctx.fill(); ctx.strokeStyle = "rgba(0,122,255,0.3)"; ctx.lineWidth = 1/cam.z; ctx.stroke(); }
 
 function render() {
     ctx.clearRect(0,0,cvs.width,cvs.height); ctx.save(); ctx.translate(cam.x, cam.y); ctx.scale(cam.z, cam.z);
     ctx.strokeStyle = "rgba(0,0,0,0.08)"; ctx.lineWidth = 1/cam.z;
     for(let i=-20; i<=40; i++){ let s = toS(i,-20), e = toS(i,40); ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(e.x,e.y); ctx.stroke(); s = toS(-20,i); e = toS(40,i); ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(e.x,e.y); ctx.stroke(); }
-    map.forEach(d => {
-        const a = assets[d.aIdx];
-        if (a.name === "OP") drawTerritory(Math.round(d.x), Math.round(d.y), 5, "rgba(0, 122, 255, 0.12)");
-        else if (a.name === "DOOM") drawTerritory(Math.round(d.x) + 1, Math.round(d.y) + 1, 6, "rgba(0, 122, 255, 0.12)");
-    });
+    map.forEach(d => { const a = assets[d.aIdx]; if (a.name === "OP") drawTerritory(Math.round(d.x), Math.round(d.y), 5, "rgba(0, 122, 255, 0.12)"); else if (a.name === "DOOM") drawTerritory(Math.round(d.x) + 1, Math.round(d.y) + 1, 6, "rgba(0, 122, 255, 0.12)"); });
     lines.forEach(l => { ctx.beginPath(); ctx.strokeStyle = "rgba(255,0,0,0.6)"; ctx.lineWidth = 4/cam.z; const s = toS(l.x1, l.y1), e = toS(l.x2, l.y2); ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke(); });
     const sorted = [...map].sort((a,b)=>(Math.round(a.x)+Math.round(a.y))-(Math.round(b.x)+Math.round(b.y)));
     sorted.forEach((d) => {
-        const a = assets[d.aIdx]; if(!a) return; 
-        const w = T_W * d.s, h = (a.img.height/a.img.width) * w, anchor = toS(d.x + a.gw + d.ox, d.y + a.gh + d.oy); 
-        ctx.drawImage(a.img, anchor.x - w / 2, anchor.y - h + d.off, w, h);
-        if(lockedId === d.id || (activeAsset === -1 && selIdx !== -1 && map[selIdx].id === d.id)) {
-            ctx.strokeStyle = "#007aff"; ctx.lineWidth = 3/cam.z;
-            const gx = Math.round(d.x), gy = Math.round(d.y), pS = toS(gx+a.gw, gy+a.gh), pW = toS(gx, gy+a.gh), pE = toS(gx+a.gw, gy), pN = toS(gx, gy); 
-            ctx.beginPath(); ctx.moveTo(pS.x,pS.y); ctx.lineTo(pW.x,pW.y); ctx.lineTo(pN.x,pN.y); ctx.lineTo(pE.x,pE.y); ctx.closePath(); ctx.stroke(); 
-        }
+        const a = assets[d.aIdx]; if(!a) return; const w = T_W * d.s, h = (a.img.height/a.img.width) * w, anchor = toS(d.x + a.gw + d.ox, d.y + a.gh + d.oy); ctx.drawImage(a.img, anchor.x - w / 2, anchor.y - h + d.off, w, h);
+        if(lockedId === d.id || (activeAsset === -1 && selIdx !== -1 && map[selIdx].id === d.id)) { ctx.strokeStyle = "#007aff"; ctx.lineWidth = (lockedId ? 1 : 3)/cam.z; const gx = Math.round(d.x), gy = Math.round(d.y), pS = toS(gx+a.gw, gy+a.gh), pW = toS(gx, gy+a.gh), pE = toS(gx+a.gw, gy), pN = toS(gx, gy); ctx.beginPath(); ctx.moveTo(pS.x,pS.y); ctx.lineTo(pW.x,pW.y); ctx.lineTo(pN.x,pN.y); ctx.lineTo(pE.x,pE.y); ctx.closePath(); ctx.stroke(); }
     });
-    sorted.forEach((d) => {
-        if (!d.mem) return;
-        const a = assets[d.aIdx]; if(!a) return; 
-        ctx.save();
-        const fVal = 9.5 * d.s, pVal = 3.2 * d.s;
-        ctx.font = `bold ${fVal}px sans-serif`;
-        const pos = toS(d.x + (a.gw / 2), d.y + (a.gh / 2));
-        const txtW = ctx.measureText(d.mem).width;
-        const bgW = txtW + (pVal * 2), bgH = fVal + pVal;
-        ctx.fillStyle = "rgba(0,0,0,0.8)"; ctx.beginPath(); ctx.roundRect(pos.x - bgW/2, pos.y - bgH/2, bgW, bgH, 2); ctx.fill();
-        ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(d.mem, pos.x, pos.y);
-        ctx.restore();
-    });
-    if(mode === 'pen' && penStart && penCurrent) {
-        ctx.beginPath(); ctx.setLineDash([6/cam.z, 3/cam.z]); ctx.strokeStyle = "rgba(255, 0, 0, 0.8)"; ctx.lineWidth = 2/cam.z;
-        const s = toS(penStart.x, penStart.y), e = toS(penCurrent.x, penCurrent.y); ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke();
-    }
+    sorted.forEach((d) => { if (!d.mem) return; const a = assets[d.aIdx]; ctx.save(); const fVal = 9.5 * d.s, pVal = 3.2 * d.s, rVal = 2.2 * d.s; ctx.font = `bold ${fVal}px sans-serif`; const pos = toS(d.x + (a.gw / 2), d.y + (a.gh / 2)); const txtW = ctx.measureText(d.mem).width; const bgW = txtW + (pVal * 2), bgH = fVal + pVal; ctx.fillStyle = "rgba(0,0,0,0.8)"; ctx.beginPath(); ctx.roundRect(pos.x - bgW/2, pos.y - bgH/2, bgW, bgH, rVal); ctx.fill(); ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(d.mem, pos.x, pos.y); ctx.restore(); });
+    if(mode === 'pen' && penStart && penCurrent) { ctx.beginPath(); ctx.setLineDash([6/cam.z, 3/cam.z]); ctx.strokeStyle = "rgba(255, 0, 0, 0.8)"; ctx.lineWidth = 2/cam.z; const s = toS(penStart.x, penStart.y), e = toS(penCurrent.x, penCurrent.y); ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke(); }
     ctx.restore();
 }
 
-function exportImage() {
-    deselect(); render();
-    const tempCvs = document.createElement('canvas'); const tempCtx = tempCvs.getContext('2d');
-    tempCvs.width = cvs.width; tempCvs.height = cvs.height;
-    tempCtx.fillStyle = '#ffffff'; tempCtx.fillRect(0, 0, tempCvs.width, tempCvs.height);
-    tempCtx.drawImage(cvs, 0, 0);
-    const dataURL = tempCvs.toDataURL("image/png");
-    document.getElementById('export-img').src = dataURL;
-    document.getElementById('export-overlay').style.display = 'flex';
-}
+function exportImage() { deselect(); render(); const tempCvs = document.createElement('canvas'); const tempCtx = tempCvs.getContext('2d'); tempCvs.width = cvs.width; tempCvs.height = cvs.height; tempCtx.fillStyle = '#ffffff'; tempCtx.fillRect(0, 0, tempCvs.width, tempCvs.height); tempCtx.drawImage(cvs, 0, 0); document.getElementById('export-img').src = tempCvs.toDataURL("image/png"); document.getElementById('export-overlay').style.display = 'flex'; }
 
 function handleStart(x, y) {
     if (guideMode) return;
     const rawG = toG(x, y), gx_o = Math.floor(rawG.x), gy_o = Math.floor(rawG.y), gx_p = Math.round(rawG.x), gy_p = Math.round(rawG.y);
     if(mode === 'pen') { penStart = {x:gx_p, y:gy_p}; penCurrent = {x:gx_p, y:gy_p}; render(); return; }
-    if(mode === 'p-erase') {
-        const distToSeg = (p, v, w) => {
-            const l2 = Math.pow(v.x-w.x,2) + Math.pow(v.y-w.y,2); if(l2 === 0) return Math.hypot(p.x-v.x, p.y-v.y);
-            let t = Math.max(0, Math.min(1, ((p.x-v.x)*(w.x-v.x) + (p.y-v.y)*(w.y-v.y)) / l2));
-            return Math.hypot(p.x-(v.x+t*(w.x-v.x)), p.y-(v.y+t*(w.y-v.y)));
-        };
-        lines = lines.filter(l => distToSeg(rawG, {x:l.x1, y:l.y1}, {x:l.x2, y:l.y2}) > 0.5); save(); render(); return;
-    }
+    if(mode === 'p-erase') { const distToSeg = (p, v, w) => { const l2 = Math.pow(v.x-w.x,2) + Math.pow(v.y-w.y,2); if(l2 === 0) return Math.hypot(p.x-v.x, p.y-v.y); let t = Math.max(0, Math.min(1, ((p.x-v.x)*(w.x-v.x) + (p.y-v.y)*(w.y-v.y)) / l2)); return Math.hypot(p.x-(v.x+t*(w.x-v.x)), p.y-(v.y+t*(w.y-v.y))); }; lines = lines.filter(l => distToSeg(rawG, {x:l.x1, y:l.y1}, {x:l.x2, y:l.y2}) > 0.5); save(); render(); return; }
     let hitIdx = map.findLastIndex(d => { const a = assets[d.aIdx]; return rawG.x >= d.x && rawG.x < d.x + a.gw && rawG.y >= d.y && rawG.y < d.y + a.gh; });
     if(mode === 'erase' && hitIdx !== -1) { map.splice(hitIdx, 1); selIdx = -1; save(); updateCurBox(); render(); return; }
     if(mode === 'move') {
-        if(hitIdx !== -1) { activeAsset = -1; selIdx = hitIdx; lockedId = map[selIdx].id; updateCurBox(); updatePanel(); render(); return; }
+        if(hitIdx !== -1) { if(activeAsset !== -1) tempAssetStore = activeAsset; activeAsset = -1; selIdx = hitIdx; lockedId = map[selIdx].id; updateCurBox(); updatePanel(); render(); return; }
+        if(activeAsset === -1 && tempAssetStore !== -1) { activeAsset = tempAssetStore; }
         if(activeAsset !== -1) { 
             const a = assets[activeAsset], nx = gx_o - (a.gw-1), ny = gy_o - (a.gh-1); 
             if(!isBlocked(nx, ny, a.gw, a.gh)) { const n = {id: Date.now()+Math.random(), x: nx, y: ny, aIdx: activeAsset, s: a.defS, off: a.defO, ox: a.ox, oy: a.oy, mem: ""}; map.push(n); selIdx = map.length - 1; lockedId = n.id; updateCurBox(); updatePanel(); save(); render(); return; } 
@@ -242,37 +173,32 @@ function handleStart(x, y) {
         selIdx = -1; lockedId = null; drag = true; updateCurBox(); render();
     }
 }
-function handleMove(x, y, dx, dy) {
-    if (guideMode) return;
-    const rawG = toG(x, y); if(mode === 'pen' && penStart) { penCurrent = {x: Math.round(rawG.x), y: Math.round(rawG.y)}; render(); return; }
-    if(lockedId) { const dIdx = map.findIndex(d => d.id === lockedId); if(dIdx !== -1) { const d = map[dIdx], a = assets[d.aIdx], nx = Math.floor(rawG.x) - (a.gw-1), ny = Math.floor(rawG.y) - (a.gh-1); if(!isBlocked(nx, ny, a.gw, a.gh, d.id)) { d.x = nx; d.y = ny; selIdx = dIdx; save(); } } } 
-    else if(drag) { cam.x += dx; cam.y += dy; } render();
-}
-function handleEnd() { if(mode === 'pen' && penStart && penCurrent) { if(penStart.x !== penCurrent.x || penStart.y !== penCurrent.y) { lines.push({x1:penStart.x, y1:penStart.y, x2:penCurrent.x, y2:penCurrent.y}); save(); } } drag = pinch = false; lockedId = null; penStart = null; penCurrent = null; render(); }
+function handleMove(x, y, dx, dy) { const rawG = toG(x, y); if(mode === 'pen' && penStart) { penCurrent = {x: Math.round(rawG.x), y: Math.round(rawG.y)}; render(); return; } if(lockedId) { const dIdx = map.findIndex(d => d.id === lockedId); if(dIdx !== -1) { const d = map[dIdx], a = assets[d.aIdx], nx = Math.floor(rawG.x) - (a.gw-1), ny = Math.floor(rawG.y) - (a.gh-1); if(!isBlocked(nx, ny, a.gw, a.gh, d.id)) { d.x = nx; d.y = ny; selIdx = dIdx; save(); } } } else if(drag) { cam.x += dx; cam.y += dy; } render(); }
+function handleEnd() { if(mode === 'pen' && penStart && penCurrent && (penStart.x !== penCurrent.x || penStart.y !== penCurrent.y)) { lines.push({x1:penStart.x, y1:penStart.y, x2:penCurrent.x, y2:penCurrent.y}); save(); } drag = pinch = false; lockedId = null; penStart = null; penCurrent = null; render(); }
 
 function setupEvents() {
     cvs.addEventListener('mousedown', e => { lastT = {x: e.clientX, y: e.clientY}; handleStart(e.clientX, e.clientY); });
     window.addEventListener('mousemove', e => { if(drag || lockedId || (mode==='pen' && penStart)) { handleMove(e.clientX, e.clientY, e.clientX-lastT.x, e.clientY-lastT.y); lastT = {x: e.clientX, y: e.clientY}; } });
     window.addEventListener('mouseup', handleEnd);
-    cvs.addEventListener('wheel', e => { if(guideMode) return; e.preventDefault(); const delta = e.deltaY > 0 ? 0.9 : 1.1; zoom(delta, e.clientX, e.clientY); render(); }, {passive: false});
+    cvs.addEventListener('wheel', e => { if(guideMode) return; e.preventDefault(); zoom(e.deltaY > 0 ? 0.9 : 1.1, e.clientX, e.clientY); render(); }, {passive: false});
     cvs.addEventListener('touchstart', e => { if(guideMode) return; if(e.touches.length >= 2) { pinch = true; lastDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); return; } const t = e.touches[0]; lastT = {x: t.clientX, y: t.clientY}; handleStart(t.clientX, t.clientY); }, {passive: false});
-    cvs.addEventListener('touchmove', e => { if(guideMode) return; e.preventDefault(); if(pinch && e.touches.length >= 2) { const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2; const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2; zoom(d / lastDist, centerX, centerY); lastDist = d; } else if(!pinch) { const t = e.touches[0]; handleMove(t.clientX, t.clientY, t.clientX-lastT.x, t.clientY-lastT.y); lastT = {x: t.clientX, y: t.clientY}; } render(); }, {passive: false});
+    cvs.addEventListener('touchmove', e => { if(guideMode) return; e.preventDefault(); if(pinch && e.touches.length >= 2) { const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); zoom(d / lastDist, (e.touches[0].clientX + e.touches[1].clientX) / 2, (e.touches[0].clientY + e.touches[1].clientY) / 2); lastDist = d; } else if(!pinch) { const t = e.touches[0]; handleMove(t.clientX, t.clientY, t.clientX-lastT.x, t.clientY-lastT.y); lastT = {x: t.clientX, y: t.clientY}; } render(); }, {passive: false});
     cvs.addEventListener('touchend', handleEnd);
 }
 
-function updateCurBox() { const box = document.getElementById('cur-box'); const nameIn = document.getElementById('member-name-in'); if(selIdx !== -1) { box.style.backgroundImage = `url(${assets[map[selIdx].aIdx].src})`; nameIn.value = map[selIdx].mem || ""; } else if(activeAsset !== -1) { box.style.backgroundImage = `url(${assets[activeAsset].src})`; nameIn.value = ""; } else { box.style.backgroundImage = 'none'; nameIn.value = ""; } }
-function openMemberList() { const listCont = document.getElementById('mem-list'); listCont.innerHTML = ""; map.filter(d => d.mem).forEach(m => { const div = document.createElement('div'); div.style = "padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between;"; div.innerHTML = `<span>${m.mem}</span><button onclick="jumpToMember('${m.id}')">移動</button>`; listCont.appendChild(div); }); document.getElementById('mem-overlay').style.display = 'flex'; }
-function jumpToMember(id) { const d = map.find(item => item.id == id); if(!d) return; const pos = toS(d.x+1, d.y+1); cam.x = cvs.width/2 - pos.x*cam.z; cam.y = cvs.height/2 - pos.y*cam.z; selIdx = map.findIndex(i => i.id == id); document.getElementById('mem-overlay').style.display='none'; render(); }
-function deselect() { activeAsset = -1; selIdx = -1; lockedId = null; updateCurBox(); render(); }
+function updateCurBox() { const box = document.getElementById('cur-box'); const nameIn = document.getElementById('member-name-in'); if(selIdx !== -1) { box.style.backgroundImage = `url(${assets[map[selIdx].aIdx].src})`; box.classList.add('has-item'); nameIn.value = map[selIdx].mem || ""; } else if(activeAsset !== -1) { box.style.backgroundImage = `url(${assets[activeAsset].src})`; box.classList.add('has-item'); nameIn.value = ""; } else { box.style.backgroundImage = 'none'; box.classList.remove('has-item'); nameIn.value = ""; } }
+function openMemberList() { const listCont = document.getElementById('mem-list'); listCont.innerHTML = ""; const members = map.filter(d => d.mem && d.mem.trim() !== ""); if(members.length === 0) { listCont.innerHTML = "<div style='text-align:center; padding:20px; color:#999;'>まだメンバーが配置されていません</div>"; } else { members.sort((a,b) => a.mem.localeCompare(b.mem)).forEach(m => { const div = document.createElement('div'); div.className = 'mem-item'; div.innerHTML = `<span>${m.mem}</span><span style="color:#007aff; font-weight:bold; font-size:12px; cursor:pointer;">表示 ▶</span>`; div.onclick = () => { jumpToMember(m.id); document.getElementById('mem-overlay').style.display='none'; }; listCont.appendChild(div); }); } document.getElementById('mem-overlay').style.display = 'flex'; }
+function jumpToMember(id) { const d = map.find(item => item.id === id); if(!d) return; const pos = toS(d.x + 1, d.y + 1); cam.x = cvs.width/2 - pos.x * cam.z; cam.y = cvs.height/2 - pos.y * cam.z; selIdx = map.findIndex(item => item.id === id); updateCurBox(); render(); }
+function deselect() { activeAsset = -1; tempAssetStore = -1; selIdx = -1; lockedId = null; updateCurBox(); render(); }
 function updateMemberName(val) { if(selIdx !== -1) { map[selIdx].mem = val; save(); render(); } }
 function toggleAssetModal(show) { document.getElementById('asset-overlay').style.display = show ? 'flex' : 'none'; }
-function addThumb(idx) { const d = document.createElement('div'); d.className = 'thumb'; d.style.backgroundImage = `url(${assets[idx].src})`; d.onclick = () => { activeAsset = idx; selIdx = -1; setMode('move'); updateCurBox(); toggleAssetModal(false); render(); }; document.getElementById('asset-grid').appendChild(d); }
+function addThumb(idx) { const d = document.createElement('div'); d.className = 'thumb'; d.style.backgroundImage = `url(${assets[idx].src})`; d.onclick = () => { activeAsset = idx; tempAssetStore = idx; selIdx = -1; lockedId = null; setMode('move'); updateCurBox(); toggleAssetModal(false); render(); }; document.getElementById('asset-grid').appendChild(d); }
 async function loadPresets() { for (const p of PRESETS) { await new Promise(res => { const img = new Image(); img.crossOrigin = "anonymous"; img.onload = () => { const src = crop(img), i2 = new Image(); i2.onload = () => { assets.push({ img: i2, src, name: p.name, defS: p.s, defO: p.o, gw: p.gw, gh: p.gh, ox: p.ox, oy: p.oy }); addThumb(assets.length - 1); res(); }; i2.src = src; }; img.src = p.url; }); } }
 function handleFiles(files) { for (const f of files) { const reader = new FileReader(); reader.onload = e => { const img = new Image(); img.onload = () => { const src = crop(img), i2 = new Image(); i2.onload = () => { assets.push({ img: i2, src, name: null, defS: 1, defO: 0, gw: 1, gh: 1, ox: 0, oy: 0 }); addThumb(assets.length - 1); }; i2.src = src; }; img.src = e.target.result; }; reader.readAsDataURL(f); } }
 function setMode(m) { mode = m; document.querySelectorAll('.mode-row button').forEach(b => b.classList.remove('active')); if(document.getElementById(`m-${m}`)) document.getElementById(`m-${m}`).classList.add('active'); render(); }
 function save() { localStorage.setItem('map_v293', JSON.stringify({m:map, l:lines})); }
 function load() { const s = localStorage.getItem('map_v293'); if(s) { const d = JSON.parse(s); map = d.m || []; lines = d.l || []; } }
-function resize() { cvs.width = cvs.parentElement.clientWidth; cvs.height = cvs.parentElement.clientHeight; render(); }
+function resize() { const nw = cvs.parentElement.clientWidth, nh = cvs.parentElement.clientHeight; if(cvs.width>0){ cam.x+=(nw-cvs.width)/2; cam.y+=(nh-cvs.height)/2; } cvs.width=nw; cvs.height=nh; render(); }
 const toS = (gx, gy) => ({ x: (gx - gy) * (T_W/2), y: (gx + gy) * (T_H/2) });
 const toG = (sx, sy) => { let x = (sx - cam.x)/cam.z, y = (sy - cam.y)/cam.z; let gy = (y/(T_H/2) - x/(T_W/2))/2; return { x: x/(T_W/2) + gy, y: gy }; };
 function isBlocked(gx, gy, gw, gh, ignoreId = null) { for (let x = gx; x < gx + gw; x++) for (let y = gy; y < gy + gh; y++) if (map.some(d => d.id !== ignoreId && x >= Math.round(d.x) && x < Math.round(d.x) + assets[d.aIdx].gw && y >= Math.round(d.y) && y < Math.round(d.y) + assets[d.aIdx].gh)) return true; return false; }
@@ -280,9 +206,9 @@ function updatePanel() { if(selIdx!==-1){ document.getElementById('size-s').valu
 function adjS(v) { if(selIdx!==-1){ map[selIdx].s = parseFloat((map[selIdx].s+v).toFixed(2)); updatePanel(); save(); render(); } }
 function adjO(v) { if(selIdx!==-1){ map[selIdx].off+=v; updatePanel(); save(); render(); } }
 function nudge(dx,dy) { if(selIdx!==-1){ map[selIdx].ox=parseFloat((map[selIdx].ox+dx).toFixed(2)); map[selIdx].oy=parseFloat((map[selIdx].oy+dy).toFixed(2)); save(); render(); } }
-function clearAll() { if(confirm("消去しますか？")){ map=[]; lines=[]; save(); render(); } }
-async function exportURL() { const exportMap = map.map(d => { const a = assets[d.aIdx]; return { n: a.name, x: d.x, y: d.y, s: d.s, off: d.off, ox: d.ox, oy: d.oy, mem: d.mem, src: a.name ? null : a.src }; }); const compressed = LZString.compressToEncodedURIComponent(JSON.stringify({ m: exportMap, l: lines })); const fullUrl = window.location.href.split('?')[0] + "?d=" + compressed; try { const res = await fetch(`https://is.gd/create.php?format=json&url=${encodeURIComponent(fullUrl)}`); const data = await res.json(); navigator.clipboard.writeText(data.shorturl || fullUrl); alert("コピーしました"); } catch (e) { navigator.clipboard.writeText(fullUrl); alert("コピーしました"); } }
-function applyData(code) { try { const json = LZString.decompressFromEncodedURIComponent(code); const d = JSON.parse(json); lines = d.l || []; map = d.m.map(item => { let aIdx = assets.findIndex(a => a.name === item.n); if(aIdx === -1 && item.src) { const img = new Image(); img.src = item.src; assets.push({ img, src: item.src, name: null, defS: 1, defO: 0, gw: 1, gh: 1, ox: 0, oy: 0 }); aIdx = assets.length - 1; } return { id: Date.now()+Math.random(), x: item.x, y: item.y, aIdx: aIdx===-1?0:aIdx, s: item.s, off: item.off, ox: item.ox, oy: item.oy, mem: item.mem || "" }; }); render(); } catch(e) {} }
+function clearAll() { if(confirm("配置をすべて消去しますか？")){ map=[]; lines=[]; selIdx=-1; lockedId=null; save(); updateCurBox(); render(); } }
+async function exportURL() { const exportMap = map.map(d => { const a = assets[d.aIdx]; return { n: a.name || null, x: d.x, y: d.y, s: d.s, off: d.off, ox: d.ox, oy: d.oy, mem: d.mem, src: a.name ? null : a.src }; }); const compressed = LZString.compressToEncodedURIComponent(JSON.stringify({ m: exportMap, l: lines })); const fullUrl = window.location.href.split('?')[0] + "?d=" + compressed; try { const res = await fetch(`https://is.gd/create.php?format=json&url=${encodeURIComponent(fullUrl)}`); const data = await res.json(); navigator.clipboard.writeText(data.shorturl || fullUrl); alert("URLをコピーしました"); } catch (e) { navigator.clipboard.writeText(fullUrl); alert("URLをコピーしました"); } }
+function applyData(code) { try { const json = LZString.decompressFromEncodedURIComponent(code); const d = JSON.parse(json); lines = d.l || []; map = d.m.map(item => { let aIdx = assets.findIndex(a => a.name === item.n); if(aIdx === -1 && item.src) { const img = new Image(); img.src = item.src; assets.push({ img, src: item.src, name: null, defS: 1, defO: 0, gw: 1, gh: 1, ox: 0, oy: 0 }); addThumb(assets.length - 1); aIdx = assets.length - 1; } return { id: Date.now()+Math.random(), x: item.x, y: item.y, aIdx: aIdx===-1?0:aIdx, s: item.s, off: item.off, ox: item.ox, oy: item.oy, mem: item.mem || "" }; }); save(); render(); } catch(e) {} }
 function crop(img) { const c = document.createElement('canvas'), t = c.getContext('2d'); c.width = img.width; c.height = img.height; t.drawImage(img,0,0); const d = t.getImageData(0,0,c.width,c.height).data; let x1=c.width, y1=c.height, x2=0, y2=0; for(let y=0; y<c.height; y++) for(let x=0; x<c.width; x++) if(d[(y*c.width+x)*4+3]>10){ x1=Math.min(x1,x); y1=Math.min(y1,y); x2=Math.max(x2,x); y2=Math.max(y2,y); } const w = x2-x1+1, h = y2-y1+1, c2 = document.createElement('canvas'); c2.width = w; c2.height = h; c2.getContext('2d').drawImage(img,x1,y1,w,h,0,0,w,h); return c2.toDataURL(); }
 init();
 document.getElementById('size-s').addEventListener('input', (e) => { if(selIdx!==-1){ map[selIdx].s = parseFloat(e.target.value); render(); } });
