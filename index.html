@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.3.5 (Drive対応版)</title>
+    <title>避難所レイアウト v29.3.5</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
-    <script src="https://apis.google.com/js/api.js"></script>
     <style>
         :root { --panel-h: 250px; --panel-w: 220px; }
         body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; display: flex; flex-direction: column; }
@@ -78,7 +77,7 @@
     <div class="tool-section">
         <div id="nudge-grid" onclick="handleGuideClick('微調整', event)"><button style="grid-column:2" onclick="if(!guideMode)nudge(0,-0.1)">↑</button><button style="grid-column:1" onclick="if(!guideMode)nudge(-0.1,0)">←</button><button style="grid-column:2" onclick="if(!guideMode)nudge(0,0.1)">↓</button><button style="grid-column:3" onclick="if(!guideMode)nudge(0.1,0)">→</button></div>
         <div class="mode-box">
-            <button class="save-btn" onclick="saveData()">保存</button>
+            <button class="save-btn" onclick="handleGuideClick('画像保存', event) || exportImage()">画像として保存</button>
             <div style="display:flex; gap:3px;"><button class="data-btn btn-out" onclick="handleGuideClick('共有URL', event) || exportURL()">共有URL</button><button class="data-btn btn-clr" onclick="handleGuideClick('全消去', event) || clearAll()">全消去</button></div>
             <div class="mode-row" onclick="handleGuideClick('モード切替', event)">
                 <button id="lock-toggle" class="lock-btn" onclick="if(!guideMode)toggleEditLock()" title="編集ロック">🔓</button>
@@ -96,73 +95,6 @@
 <script>
 let guideMode = false;
 let isEditLocked = false;
-let driveFileId = null; // ドライブのIDを保持
-
-// 初期化時にドライブURLをチェック
-async function init() {
-    window.addEventListener('resize', resize);
-    resize();
-    cam.x = cvs.width/2; 
-    cam.y = cvs.height/3;
-    
-    await loadPresets();
-    
-    const params = new URLSearchParams(window.location.search);
-    const driveUrl = params.get('load');
-    if (driveUrl) {
-        // ドライブURLからIDを抽出する処理（必要に応じて調整してください）
-        driveFileId = driveUrl.split('/d/')[1]?.split('/')[0];
-        if (driveFileId) {
-            await loadFromDrive(driveFileId);
-        }
-    } else {
-        load(); // ローカルストレージから読み込み
-    }
-    render();
-    setupEvents();
-}
-
-// ドライブから読み込み
-async function loadFromDrive(id) {
-    try {
-        const response = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media`, {
-            headers: { 'Authorization': `Bearer ${await getAuthToken()}` }
-        });
-        const data = await response.json();
-        applyDataObj(data);
-    } catch (e) {
-        alert("読み込み失敗: " + e.message);
-    }
-}
-
-// 保存ボタン押下時
-async function saveData() {
-    if (driveFileId) {
-        // ドライブに上書き保存
-        try {
-            const data = { m: map, l: lines };
-            await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}`, {
-                method: 'PATCH',
-                headers: { 'Authorization': `Bearer ${await getAuthToken()}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
-            alert("ドライブに上書き保存しました");
-        } catch (e) {
-            alert("保存エラー: " + e.message);
-        }
-    } else {
-        // ローカル保存
-        save();
-        alert("ローカルに保存しました");
-    }
-}
-
-// 簡易認証（実際の実装ではGAPIのOAuthフローを組み込む必要があります）
-async function getAuthToken() {
-    // ここでGoogle Identity Services等を使用してトークンを取得してください
-    // プロトタイプとして簡略化しています
-    return ""; 
-}
 
 const GUIDE_TEXT = {
     '選択解除': '現在選んでいる建物を解除します。',
@@ -196,11 +128,24 @@ function handleGuideClick(key, event) {
     return true;
 }
 
+// 修正箇所：ロック解除時に確認ポップアップを表示
 function toggleEditLock() {
-    if (isEditLocked) { if (!confirm("閲覧モードを解除しますか？")) return; }
+    if (isEditLocked) {
+        if (!confirm("閲覧モードを解除しますか？")) {
+            return;
+        }
+    }
+
     isEditLocked = !isEditLocked;
     const btn = document.getElementById('lock-toggle');
-    if (isEditLocked) { btn.classList.add('locked'); btn.innerText = '🔒'; deselect(); } else { btn.classList.remove('locked'); btn.innerText = '🔓'; }
+    if (isEditLocked) {
+        btn.classList.add('locked');
+        btn.innerText = '🔒';
+        deselect();
+    } else {
+        btn.classList.remove('locked');
+        btn.innerText = '🔓';
+    }
 }
 
 const PRESETS = [
@@ -220,6 +165,8 @@ const T_W = 64, T_H = 32;
 let cam = { x: 0, y: 0, z: 1 }, assets = [], map = [], lines = [], selIdx = -1, activeAsset = -1, mode = 'move';
 let drag = false, pinch = false, lockedId = null, penStart = null, penCurrent = null, lastT = {x: 0, y: 0}, lastDist = 0, tempAssetStore = -1;
 
+function init() { window.addEventListener('resize', resize); resize(); cam.x = cvs.width/2; cam.y = cvs.height/3; loadPresets().then(() => { const params = new URLSearchParams(window.location.search); const urlData = params.get('d'); if (urlData) applyData(urlData); else load(); render(); }); setupEvents(); }
+function zoom(scaleChange, centerX, centerY) { const newZ = Math.min(Math.max(cam.z * scaleChange, 0.1), 5); const ratio = newZ / cam.z; cam.x = centerX - (centerX - cam.x) * ratio; cam.y = centerY - (centerY - cam.y) * ratio; cam.z = newZ; }
 function drawTerritory(gx, gy, range, color) { ctx.fillStyle = color; ctx.beginPath(); const p1 = toS(gx - range, gy - range), p2 = toS(gx + range + 1, gy - range), p3 = toS(gx + range + 1, gy + range + 1), p4 = toS(gx - range, gy + range + 1); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.lineTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y); ctx.closePath(); ctx.fill(); ctx.strokeStyle = "rgba(0,122,255,0.3)"; ctx.lineWidth = 1/cam.z; ctx.stroke(); }
 
 function render() {
@@ -247,10 +194,11 @@ function handleStart(x, y) {
         selIdx = -1; lockedId = null; drag = true; updateCurBox(); render();
         return;
     }
+
     if(mode === 'pen') { penStart = {x:gx_p, y:gy_p}; penCurrent = {x:gx_p, y:gy_p}; render(); return; }
-    if(mode === 'p-erase') { const distToSeg = (p, v, w) => { const l2 = Math.pow(v.x-w.x,2) + Math.pow(v.y-w.y,2); if(l2 === 0) return Math.hypot(p.x-v.x, p.y-v.y); let t = Math.max(0, Math.min(1, ((p.x-v.x)*(w.x-v.x) + (p.y-v.y)*(w.y-v.y)) / l2)); return Math.hypot(p.x-(v.x+t*(w.x-v.x)), p.y-(v.y+t*(w.y-v.y))); }; lines = lines.filter(l => distToSeg(rawG, {x:l.x1, y:l.y1}, {x:l.x2, y:l.y2}) > 0.5); render(); return; }
+    if(mode === 'p-erase') { const distToSeg = (p, v, w) => { const l2 = Math.pow(v.x-w.x,2) + Math.pow(v.y-w.y,2); if(l2 === 0) return Math.hypot(p.x-v.x, p.y-v.y); let t = Math.max(0, Math.min(1, ((p.x-v.x)*(w.x-v.x) + (p.y-v.y)*(w.y-v.y)) / l2)); return Math.hypot(p.x-(v.x+t*(w.x-v.x)), p.y-(v.y+t*(w.y-v.y))); }; lines = lines.filter(l => distToSeg(rawG, {x:l.x1, y:l.y1}, {x:l.x2, y:l.y2}) > 0.5); save(); render(); return; }
     let hitIdx = map.findLastIndex(d => { const a = assets[d.aIdx]; return rawG.x >= d.x && rawG.x < d.x + a.gw && rawG.y >= d.y && rawG.y < d.y + a.gh; });
-    if(mode === 'erase' && hitIdx !== -1) { map.splice(hitIdx, 1); selIdx = -1; updateCurBox(); render(); return; }
+    if(mode === 'erase' && hitIdx !== -1) { map.splice(hitIdx, 1); selIdx = -1; save(); updateCurBox(); render(); return; }
     if(mode === 'move') {
         if(hitIdx !== -1) { if(activeAsset !== -1) tempAssetStore = activeAsset; activeAsset = -1; selIdx = hitIdx; lockedId = map[selIdx].id; updateCurBox(); updatePanel(); render(); return; }
         if(activeAsset === -1 && tempAssetStore !== -1) { activeAsset = tempAssetStore; }
@@ -259,14 +207,14 @@ function handleStart(x, y) {
             if(!isBlocked(nx, ny, a.gw, a.gh)) { 
                 const prev = [...map].reverse().find(d => d.aIdx === activeAsset);
                 const n = { id: Date.now() + Math.random(), x: nx, y: ny, aIdx: activeAsset, s: prev ? prev.s : a.defS, off: prev ? prev.off : a.defO, ox: prev ? prev.ox : a.ox, oy: prev ? prev.oy : a.oy, mem: "" }; 
-                map.push(n); selIdx = map.length - 1; lockedId = n.id; updateCurBox(); updatePanel(); render(); return; 
+                map.push(n); selIdx = map.length - 1; lockedId = n.id; updateCurBox(); updatePanel(); save(); render(); return; 
             } 
         }
         selIdx = -1; lockedId = null; drag = true; updateCurBox(); render();
     }
 }
-function handleMove(x, y, dx, dy) { const rawG = toG(x, y); if(mode === 'pen' && penStart) { penCurrent = {x: Math.round(rawG.x), y: Math.round(rawG.y)}; render(); return; } if(lockedId) { const dIdx = map.findIndex(d => d.id === lockedId); if(dIdx !== -1) { const d = map[dIdx], a = assets[d.aIdx], nx = Math.floor(rawG.x) - (a.gw-1), ny = Math.floor(rawG.y) - (a.gh-1); if(!isBlocked(nx, ny, a.gw, a.gh, d.id)) { d.x = nx; d.y = ny; selIdx = dIdx; } } } else if(drag) { cam.x += dx; cam.y += dy; } render(); }
-function handleEnd() { if(mode === 'pen' && penStart && penCurrent && (penStart.x !== penCurrent.x || penStart.y !== penCurrent.y)) { lines.push({x1:penStart.x, y1:penStart.y, x2:penCurrent.x, y2:penCurrent.y}); } drag = pinch = false; lockedId = null; penStart = null; penCurrent = null; render(); }
+function handleMove(x, y, dx, dy) { const rawG = toG(x, y); if(mode === 'pen' && penStart) { penCurrent = {x: Math.round(rawG.x), y: Math.round(rawG.y)}; render(); return; } if(lockedId) { const dIdx = map.findIndex(d => d.id === lockedId); if(dIdx !== -1) { const d = map[dIdx], a = assets[d.aIdx], nx = Math.floor(rawG.x) - (a.gw-1), ny = Math.floor(rawG.y) - (a.gh-1); if(!isBlocked(nx, ny, a.gw, a.gh, d.id)) { d.x = nx; d.y = ny; selIdx = dIdx; save(); } } } else if(drag) { cam.x += dx; cam.y += dy; } render(); }
+function handleEnd() { if(mode === 'pen' && penStart && penCurrent && (penStart.x !== penCurrent.x || penStart.y !== penCurrent.y)) { lines.push({x1:penStart.x, y1:penStart.y, x2:penCurrent.x, y2:penCurrent.y}); save(); } drag = pinch = false; lockedId = null; penStart = null; penCurrent = null; render(); }
 
 function setupEvents() {
     cvs.addEventListener('mousedown', e => { if(guideMode) return; lastT = {x: e.clientX, y: e.clientY}; handleStart(e.clientX, e.clientY); });
@@ -282,7 +230,7 @@ function updateCurBox() { const box = document.getElementById('cur-box'); const 
 function openMemberList() { const listCont = document.getElementById('mem-list'); listCont.innerHTML = ""; const members = map.filter(d => d.mem && d.mem.trim() !== ""); if(members.length === 0) { listCont.innerHTML = "<div style='text-align:center; padding:20px; color:#999;'>まだメンバーが配置されていません</div>"; } else { members.sort((a,b) => a.mem.localeCompare(b.mem)).forEach(m => { const div = document.createElement('div'); div.className = 'mem-item'; div.innerHTML = `<span>${m.mem}</span><span style="color:#007aff; font-weight:bold; font-size:12px; cursor:pointer;">表示 ▶</span>`; div.onclick = () => { jumpToMember(m.id); document.getElementById('mem-overlay').style.display='none'; }; listCont.appendChild(div); }); } document.getElementById('mem-overlay').style.display = 'flex'; }
 function jumpToMember(id) { const d = map.find(item => item.id === id); if(!d) return; const pos = toS(d.x + 1, d.y + 1); cam.x = cvs.width/2 - pos.x * cam.z; cam.y = cvs.height/2 - pos.y * cam.z; selIdx = map.findIndex(item => item.id === id); updateCurBox(); render(); }
 function deselect() { activeAsset = -1; tempAssetStore = -1; selIdx = -1; lockedId = null; updateCurBox(); render(); }
-function updateMemberName(val) { if(isEditLocked) return; if(selIdx !== -1) { map[selIdx].mem = val; render(); } }
+function updateMemberName(val) { if(isEditLocked) return; if(selIdx !== -1) { map[selIdx].mem = val; save(); render(); } }
 function toggleAssetModal(show) { if(isEditLocked && show) return; document.getElementById('asset-overlay').style.display = show ? 'flex' : 'none'; }
 function addThumb(idx) { const d = document.createElement('div'); d.className = 'thumb'; d.style.backgroundImage = `url(${assets[idx].src})`; d.onclick = () => { if(isEditLocked) return; activeAsset = idx; tempAssetStore = idx; selIdx = -1; lockedId = null; setMode('move'); updateCurBox(); toggleAssetModal(false); render(); }; document.getElementById('asset-grid').appendChild(d); }
 async function loadPresets() { for (const p of PRESETS) { await new Promise(res => { const img = new Image(); img.crossOrigin = "anonymous"; img.onload = () => { const src = crop(img), i2 = new Image(); i2.onload = () => { assets.push({ img: i2, src, name: p.name, defS: p.s, defO: p.o, gw: p.gw, gh: p.gh, ox: p.ox, oy: p.oy }); addThumb(assets.length - 1); res(); }; i2.src = src; }; img.src = p.url; }); } }
@@ -295,31 +243,60 @@ const toS = (gx, gy) => ({ x: (gx - gy) * (T_W/2), y: (gx + gy) * (T_H/2) });
 const toG = (sx, sy) => { let x = (sx - cam.x)/cam.z, y = (sy - cam.y)/cam.z; let gy = (y/(T_H/2) - x/(T_W/2))/2; return { x: x/(T_W/2) + gy, y: gy }; };
 function isBlocked(gx, gy, gw, gh, ignoreId = null) { for (let x = gx; x < gx + gw; x++) for (let y = gy; y < gy + gh; y++) if (map.some(d => d.id !== ignoreId && x >= Math.round(d.x) && x < Math.round(d.x) + assets[d.aIdx].gw && y >= Math.round(d.y) && y < Math.round(d.y) + assets[d.aIdx].gh)) return true; return false; }
 function updatePanel() { if(selIdx!==-1){ document.getElementById('size-s').value = map[selIdx].s; document.getElementById('off-s').value = map[selIdx].off; } }
-function adjS(v) { if(isEditLocked) return; if(selIdx!==-1){ map[selIdx].s = parseFloat((map[selIdx].s+v).toFixed(2)); updatePanel(); render(); } }
-function adjO(v) { if(isEditLocked) return; if(selIdx!==-1){ map[selIdx].off+=v; updatePanel(); render(); } }
-function nudge(dx,dy) { if(isEditLocked) return; if(selIdx!==-1){ map[selIdx].ox=parseFloat((map[selIdx].ox+dx).toFixed(2)); map[selIdx].oy=parseFloat((map[selIdx].oy+dy).toFixed(2)); render(); } }
-function clearAll() { if(isEditLocked) return; if(confirm("配置をすべて消去しますか？")){ map=[]; lines=[]; selIdx=-1; lockedId=null; updateCurBox(); render(); } }
+function adjS(v) { if(isEditLocked) return; if(selIdx!==-1){ map[selIdx].s = parseFloat((map[selIdx].s+v).toFixed(2)); updatePanel(); save(); render(); } }
+function adjO(v) { if(isEditLocked) return; if(selIdx!==-1){ map[selIdx].off+=v; updatePanel(); save(); render(); } }
+function nudge(dx,dy) { if(isEditLocked) return; if(selIdx!==-1){ map[selIdx].ox=parseFloat((map[selIdx].ox+dx).toFixed(2)); map[selIdx].oy=parseFloat((map[selIdx].oy+dy).toFixed(2)); save(); render(); } }
+function clearAll() { if(isEditLocked) return; if(confirm("配置をすべて消去しますか？")){ map=[]; lines=[]; selIdx=-1; lockedId=null; save(); updateCurBox(); render(); } }
 
 async function exportURL() {
-    const exportMap = map.map(d => { const a = assets[d.aIdx]; return { n: a.name || null, x: d.x, y: d.y, s: d.s, off: d.off, ox: d.ox, oy: d.oy, mem: d.mem, src: a.name ? null : a.src }; });
-    const compressed = LZString.compressToEncodedURIComponent(JSON.stringify({ m: exportMap, l: lines, locked: isEditLocked }));
+    const exportMap = map.map(d => {
+        const a = assets[d.aIdx];
+        return { n: a.name || null, x: d.x, y: d.y, s: d.s, off: d.off, ox: d.ox, oy: d.oy, mem: d.mem, src: a.name ? null : a.src };
+    });
+    
+    const compressed = LZString.compressToEncodedURIComponent(JSON.stringify({ 
+        m: exportMap, 
+        l: lines,
+        locked: isEditLocked
+    }));
+    
     const fullUrl = window.location.href.split('?')[0] + "?d=" + compressed;
-    navigator.clipboard.writeText(fullUrl);
-    alert("共有URLをコピーしました");
+    
+    try {
+        const res = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(fullUrl)}`);
+        const shortUrl = await res.text();
+        
+        navigator.clipboard.writeText(shortUrl);
+        alert(isEditLocked ? "閲覧専用の短縮URLをコピーしました" : "編集可能の短縮URLをコピーしました");
+    } catch (e) {
+        navigator.clipboard.writeText(fullUrl);
+        alert("短縮に失敗したため、フルURLをコピーしました。");
+    }
 }
 
-function applyDataObj(d) {
-    lines = d.l || [];
-    map = d.m.map(item => {
-        let aIdx = assets.findIndex(a => a.name === item.n);
-        if(aIdx === -1 && item.src) {
-            const img = new Image(); img.src = item.src;
-            assets.push({ img, src: item.src, name: null, defS: 1, defO: 0, gw: 1, gh: 1, ox: 0, oy: 0 });
-            addThumb(assets.length - 1); aIdx = assets.length - 1;
+function applyData(code) {
+    try {
+        const json = LZString.decompressFromEncodedURIComponent(code);
+        const d = JSON.parse(json);
+        lines = d.l || [];
+        map = d.m.map(item => {
+            let aIdx = assets.findIndex(a => a.name === item.n);
+            if(aIdx === -1 && item.src) {
+                const img = new Image();
+                img.src = item.src;
+                assets.push({ img, src: item.src, name: null, defS: 1, defO: 0, gw: 1, gh: 1, ox: 0, oy: 0 });
+                addThumb(assets.length - 1);
+                aIdx = assets.length - 1;
+            }
+            return { id: Date.now()+Math.random(), x: item.x, y: item.y, aIdx: aIdx===-1?0:aIdx, s: item.s, off: item.off, ox: item.ox, oy: item.oy, mem: item.mem || "" };
+        });
+        save();
+        render();
+
+        if (d.locked) {
+            if(!isEditLocked) toggleEditLock();
         }
-        return { id: Date.now()+Math.random(), x: item.x, y: item.y, aIdx: aIdx===-1?0:aIdx, s: item.s, off: item.off, ox: item.ox, oy: item.oy, mem: item.mem || "" };
-    });
-    render();
+    } catch(e) {}
 }
 
 function crop(img) { const c = document.createElement('canvas'), t = c.getContext('2d'); c.width = img.width; c.height = img.height; t.drawImage(img,0,0); const d = t.getImageData(0,0,c.width,c.height).data; let x1=c.width, y1=c.height, x2=0, y2=0; for(let y=0; y<c.height; y++) for(let x=0; x<c.width; x++) if(d[(y*c.width+x)*4+3]>10){ x1=Math.min(x1,x); y1=Math.min(y1,y); x2=Math.max(x2,x); y2=Math.max(y2,y); } const w = x2-x1+1, h = y2-y1+1, c2 = document.createElement('canvas'); c2.width = w; c2.height = h; c2.getContext('2d').drawImage(img,x1,y1,w,h,0,0,w,h); return c2.toDataURL(); }
