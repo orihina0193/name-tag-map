@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.5.2</title>
+    <title>避難所レイアウト v29.5.3</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
         :root { --panel-h: 250px; --panel-w: 220px; }
@@ -178,8 +178,9 @@ function loadFromCloud() {
         return res.json();
     })
     .then(json => {
-        if (json.data && json.data.compressed) {
-            const d = JSON.parse(LZString.decompressFromEncodedURIComponent(json.data.compressed));
+        // サーバー変更：json.data.str からデータを展開
+        if (json.data && json.data.str) {
+            const d = JSON.parse(LZString.decompressFromEncodedURIComponent(json.data.str));
             map = d.m || [];
             lines = d.l || [];
             render();
@@ -193,7 +194,6 @@ function loadFromCloud() {
 }
 
 function saveToCloud() {
-    // 部屋名が未指定の場合、その場で部屋名を入力してもらう
     if (!currentRoomName) {
         const inputName = prompt("データを保存する新しい部屋名を入力してください（例: orange）\n※ここで決めた部屋名がそのままみんなに配るURLになります。");
         if (!inputName || inputName.trim() === "") {
@@ -203,7 +203,6 @@ function saveToCloud() {
         currentRoomName = inputName.trim();
         document.getElementById('room-badge').innerText = `部屋: ${currentRoomName}`;
         
-        // ブラウザのURL表示を入力された部屋名に書き換える（安全に履歴を上書き）
         const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?room=' + currentRoomName;
         window.history.replaceState({path:newUrl}, '', newUrl);
     }
@@ -215,9 +214,10 @@ function saveToCloud() {
     const rawStr = JSON.stringify({m: map, l: lines});
     const compressedStr = LZString.compressToEncodedURIComponent(rawStr);
 
+    // サーバー変更：エラー回避のため、data直下のキー名を「str」という短い名前に統一
     const payload = {
-        name: `layout_room_${currentRoomName}`,
-        data: { compressed: compressedStr }
+        name: `room_${currentRoomName}`,
+        data: { str: compressedStr }
     };
 
     const method = cloudObjectId ? 'PUT' : 'POST';
@@ -228,27 +228,29 @@ function saveToCloud() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
     })
-    .then(res => res.json())
+    .then(res => {
+        if(!res.ok) throw new Error("Server Error");
+        return res.json();
+    })
     .then(json => {
         if(json.id) {
             cloudObjectId = json.id;
             localStorage.setItem(`cloud_id_${currentRoomName}`, json.id);
             showStatus("部屋に保存しました！", "#34c759");
-            save(); // 本体のバックアップも更新
+            save(); 
             
-            // 共有用URLをクリップボードに自動コピーしてあげる親切機能
             const shareUrl = window.location.href;
             navigator.clipboard.writeText(shareUrl).then(() => {
-                alert(`【${currentRoomName}】の部屋データをサーバーに保存しました！\n\n他メンバー共有用のURLをクリップボードにコピーしました。そのままLINEやDiscordに貼り付けて配れます！`);
+                alert(`【${currentRoomName}】の部屋データをサーバーに保存しました！\n\n共有用URLをコピーしましたので、そのままLINEやDiscordに貼り付けられます。`);
             }).catch(() => {
-                alert(`【${currentRoomName}】の部屋データを保存しました！\n\n今のブラウザのURL（末尾に ?room=${currentRoomName} がついたもの）をコピーして共有してください。`);
+                alert(`【${currentRoomName}】の部屋データを保存しました！\n\nブラウザのURLをコピーして共有してください。`);
             });
         }
     })
     .catch(err => {
         console.error(err);
         showStatus("保存エラー", "#ff3b30");
-        alert("通信エラーが発生しました。本体に保存します。");
+        alert("通信保存に失敗しました。お使いの端末（ブラウザ）へバックアップとして保存します。");
         save();
     });
 }
