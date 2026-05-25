@@ -10,21 +10,17 @@
         body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; display: flex; flex-direction: column; }
         #main-container { flex: 1; position: relative; overflow: hidden; }
         canvas { display: block; background: #f0f0f0; width: 100%; height: 100%; cursor: crosshair; }
-        
         #room-badge { position: absolute; top: 75px; left: 15px; background: rgba(0,0,0,0.7); color: #fff; padding: 6px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; z-index: 500; pointer-events: none; }
         #sync-status { position: absolute; top: 75px; right: 65px; background: #34c759; color: #fff; padding: 6px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; z-index: 500; display: none; }
-
         #guide-trigger { position: absolute; top: 75px; right: 15px; width: 40px; height: 40px; background: rgba(0,122,255,0.9); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 20px; z-index: 500; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); border: 2px solid #fff; }
         #guide-trigger.active { background: #ff3b30; }
         #guide-msg-box { position: absolute; top: 125px; left: 50%; transform: translateX(-50%); width: 80%; background: rgba(0,0,0,0.85); color: white; padding: 15px; border-radius: 12px; font-size: 14px; line-height: 1.5; z-index: 2500; display: none; text-align: center; pointer-events: none; }
-
         #top-panel { position: absolute; top: 0; width: 100%; height: 65px; background: rgba(255,255,255,0.9); border-bottom: 1px solid #ccc; display: flex; align-items: center; padding: 0 10px; box-sizing: border-box; z-index: 100; gap: 8px; }
         #cur-box { width: 50px; height: 50px; border: 2px solid #007aff; border-radius: 8px; background: #fff; background-size: contain; background-repeat: no-repeat; background-position: center; flex-shrink: 0; cursor: pointer; position: relative; }
         #cur-box.has-item::after { content: "解除"; position: absolute; bottom: -2px; right: -2px; background: #007aff; color: #fff; font-size: 8px; padding: 1px 3px; border-radius: 4px; }
         #member-name-in { flex: 1; height: 45px; border: 1px solid #ccc; border-radius: 8px; padding: 0 12px; font-size: 16px; min-width: 0; outline: none; background: #fff; }
         .top-btn { width: 44px; height: 50px; border-radius: 8px; border: 1px solid #ccc; background: #fff; font-size: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; }
         .reload-btn { height: 50px; width: 44px; border-radius: 8px; border: 1px solid #ff9500; background: #fff; color: #ff9500; font-size: 20px; font-weight: bold; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; }
-
         #bot-panel { background: rgba(255,255,255,0.98); border-top: 1px solid #ccc; padding: 8px 10px; box-sizing: border-box; z-index: 100; display: flex; flex-direction: column; gap: 6px; height: var(--panel-h); }
         .row { display: flex; align-items: center; gap: 5px; }
         .row label { font-size: 10px; font-weight: bold; width: 12px; flex-shrink: 0; text-align: center; }
@@ -34,20 +30,16 @@
         #nudge-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; width: 105px; flex-shrink: 0; }
         #nudge-grid button { height: 36px; font-size: 18px; border: 1px solid #ccc; background: #fff; border-radius: 6px; color: #007aff; }
         .mode-box { flex: 1; display: flex; flex-direction: column; gap: 4px; width: 100%; }
-        
         .main-actions { display: flex; gap: 4px; width: 100%; }
         .action-btn { flex: 1; height: 36px; font-size: 12px; font-weight: bold; border-radius: 6px; border: none; color: white; cursor: pointer; }
         .btn-img { background: #34c759; }
         .btn-save { background: #007aff; }
         .btn-clr { background: #ff3b30; height: 26px; font-size: 10px; }
-
         .mode-row { display: flex; gap: 2px; align-items: center; }
         .mode-row button { flex: 1; height: 30px; font-size: 9px; font-weight: bold; border-radius: 5px; border: 1px solid #ccc; background: #fff; }
         .mode-row button.active { background: #007aff; color: #fff; }
-        
         .lock-btn { width: 40px; height: 30px; font-size: 14px; border-radius: 5px; border: 1px solid #ff9500; background: #fff; color: #ff9500; font-weight: bold; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
         .lock-btn.locked { background: #ff9500; color: #fff; }
-
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; display: none; align-items: center; justify-content: center; }
         .modal { width: 85%; max-height: 70%; background: #f8f9fa; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
         .modal-title { font-size: 16px; font-weight: bold; color: #333; border-bottom: 2px solid #007aff; padding-bottom: 5px; }
@@ -103,18 +95,11 @@
 <div id="export-overlay" onclick="this.style.display='none'"><img id="export-img"></div>
 
 <script>
-// --- Supabase 設定 ---
 const SUPABASE_URL = "https://idehbfkznpyngvbfalax.supabase.co";
 const SUPABASE_KEY = "sb_publishable_cZ8eWRWAX9XrijO1yuzT4A_a1ef1n5j";
 
-// Supabase用の簡易 fetch 関数
 async function supabaseFetch(endpoint, method = 'GET', body = null) {
-    const headers = {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=representation'
-    };
+    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
     const url = `${SUPABASE_URL}/rest/v1/${endpoint}`;
     const options = { method, headers };
     if (body) options.body = JSON.stringify(body);
@@ -125,17 +110,7 @@ let currentRoomName = null;
 let cloudObjectId = null;
 let guideMode = false, isEditLocked = false;
 const GUIDE_TEXT = {
-    '選択解除': '現在選んでいる建物を解除します。',
-    'ギルメン名': '配置した建物に名前を付けます。',
-    '名簿': '配置済みのメンバーを一覧表示します。',
-    '素材追加': '建物の追加。',
-    'リセット': 'リセットします。',
-    'サイズ調整': '建物の大きさを変えます。',
-    '接地調整': '重なり順や接地位置を調整します。',
-    '微調整': 'ドット単位で細かく動かします。',
-    '画像保存': '画像として保存します。',
-    '全消去': 'すべて消去します。',
-    'モード切替': '移動、ペン、消しゴム等のモード切替。'
+    '選択解除': '現在選んでいる建物を解除します。', 'ギルメン名': '配置した建物に名前を付けます。', '名簿': '配置済みのメンバーを一覧表示します。', '素材追加': '建物の追加。', 'リセット': 'リセットします。', 'サイズ調整': '建物の大きさを変えます。', '接地調整': '重なり順や接地位置を調整します。', '微調整': 'ドット単位で細かく動かします。', '画像保存': '画像として保存します。', '全消去': 'すべて消去します。', 'モード切替': '移動、ペン、消しゴム等のモード切替。'
 };
 
 function toggleGuideMode() { guideMode = !guideMode; const btn = document.getElementById('guide-trigger'); const msg = document.getElementById('guide-msg-box'); btn.classList.toggle('active'); btn.innerText = guideMode ? '×' : '?'; msg.style.display = guideMode ? 'block' : 'none'; if (!guideMode) deselect(); }
@@ -159,45 +134,33 @@ const T_W = 64, T_H = 32;
 let cam = { x: 0, y: 0, z: 1 }, assets = [], map = [], lines = [], selIdx = -1, activeAsset = -1, mode = 'move';
 let drag = false, pinch = false, lockedId = null, penStart = null, penCurrent = null, lastT = {x: 0, y: 0}, lastDist = 0, tempAssetStore = -1;
 
-function init() { 
+async function init() { 
     window.addEventListener('resize', resize); resize(); cam.x = cvs.width/2; cam.y = cvs.height/3; 
-    
     const params = new URLSearchParams(window.location.search);
     currentRoomName = params.get('room');
-    
     if (currentRoomName) {
         document.getElementById('room-badge').innerText = `部屋: ${currentRoomName}`;
         cloudObjectId = localStorage.getItem(`cloud_id_${currentRoomName}`);
     }
-
-    loadPresets().then(() => { 
-        if (currentRoomName) {
-            loadFromCloud();
-        } else {
-            load();
-        }
-        render(); 
-    }); 
-    setupEvents(); }
+    await loadPresets(); 
+    if (currentRoomName) { await loadFromCloud(); } else { load(); }
+    render(); 
+    setupEvents(); 
+}
 
 async function loadFromCloud() {
-    if (!currentRoomName) return load();
-    
     showStatus("読み込み中...", "#ff9500");
-    // roomsテーブルから name が currentRoomName のものを取得
     const data = await supabaseFetch(`rooms?name=eq.${encodeURIComponent(currentRoomName)}&select=id,data`);
-    
     if (data && data.length > 0) {
         cloudObjectId = data[0].id;
         const d = JSON.parse(LZString.decompressFromEncodedURIComponent(data[0].data));
-        map = d.m || [];
-        lines = d.l || [];
-        render();
+        map = d.m || []; lines = d.l || [];
         showStatus("同期完了", "#34c759");
     } else {
         showStatus("新規ルームです", "#007aff");
         load();
     }
+    render();
 }
 
 async function saveToCloud() {
@@ -206,39 +169,22 @@ async function saveToCloud() {
         if (!inputName) return;
         currentRoomName = inputName.trim();
         document.getElementById('room-badge').innerText = `部屋: ${currentRoomName}`;
-        
         const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?room=' + currentRoomName;
         window.history.replaceState({path:newUrl}, '', newUrl);
     }
-
     showStatus("保存中...", "#ff9500");
-    const rawStr = JSON.stringify({m: map, l: lines});
-    const compressedStr = LZString.compressToEncodedURIComponent(rawStr);
-
+    const compressedStr = LZString.compressToEncodedURIComponent(JSON.stringify({m: map, l: lines}));
     if (cloudObjectId) {
-        // 更新 (PATCH)
         await supabaseFetch(`rooms?id=eq.${cloudObjectId}`, 'PATCH', { data: compressedStr });
     } else {
-        // 新規作成 (POST)
         const result = await supabaseFetch('rooms', 'POST', { name: currentRoomName, data: compressedStr });
         if (result && result[0]) cloudObjectId = result[0].id;
     }
-    
     showStatus("保存しました！", "#34c759");
     localStorage.setItem(`cloud_id_${currentRoomName}`, cloudObjectId);
-    alert("保存完了！URLを共有してください。");
 }
 
-function showStatus(text, color) {
-    const status = document.getElementById('sync-status');
-    status.innerText = text;
-    status.style.backgroundColor = color;
-    status.style.display = 'block';
-    if(color === "#34c759" || color === "#8e8e93" || color === "#007aff") {
-        setTimeout(() => { status.style.display = 'none'; }, 3000);
-    }
-}
-
+function showStatus(text, color) { const status = document.getElementById('sync-status'); status.innerText = text; status.style.backgroundColor = color; status.style.display = 'block'; setTimeout(() => { status.style.display = 'none'; }, 3000); }
 function zoom(scaleChange, centerX, centerY) { const newZ = Math.min(Math.max(cam.z * scaleChange, 0.1), 5); const ratio = newZ / cam.z; cam.x = centerX - (centerX - cam.x) * ratio; cam.y = centerY - (centerY - cam.y) * ratio; cam.z = newZ; }
 function drawTerritory(gx, gy, range, color) { ctx.fillStyle = color; ctx.beginPath(); const p1 = toS(gx - range, gy - range), p2 = toS(gx + range + 1, gy - range), p3 = toS(gx + range + 1, gy + range + 1), p4 = toS(gx - range, gy + range + 1); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.lineTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y); ctx.closePath(); ctx.fill(); ctx.strokeStyle = "rgba(0,122,255,0.3)"; ctx.lineWidth = 1/cam.z; ctx.stroke(); }
 function render() { ctx.clearRect(0,0,cvs.width,cvs.height); ctx.save(); ctx.translate(cam.x, cam.y); ctx.scale(cam.z, cam.z); ctx.strokeStyle = "rgba(0,0,0,0.08)"; ctx.lineWidth = 1/cam.z; for(let i=-20; i<=40; i++){ let s = toS(i,-20), e = toS(i,40); ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(e.x,e.y); ctx.stroke(); s = toS(-20,i); e = toS(40,i); ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(e.x,i); ctx.stroke(); } map.forEach(d => { const a = assets[d.aIdx]; if(!a) return; if (a.name === "OP") drawTerritory(Math.round(d.x), Math.round(d.y), 5, "rgba(0, 122, 255, 0.12)"); else if (a.name === "DOOM") drawTerritory(Math.round(d.x) + 1, Math.round(d.y) + 1, 6, "rgba(0, 122, 255, 0.12)"); }); lines.forEach(l => { ctx.beginPath(); ctx.strokeStyle = "rgba(255,0,0,0.6)"; ctx.lineWidth = 4/cam.z; const s = toS(l.x1, l.y1), e = toS(l.x2, l.y2); ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke(); }); const sorted = [...map].sort((a,b)=>(Math.round(a.x)+Math.round(a.y))-(Math.round(b.x)+Math.round(b.y))); sorted.forEach((d) => { const a = assets[d.aIdx]; if(!a) return; const w = T_W * d.s, h = (a.img.height/a.img.width) * w, anchor = toS(d.x + a.gw + d.ox, d.y + a.gh + d.oy); ctx.drawImage(a.img, anchor.x - w / 2, anchor.y - h + d.off, w, h); if(lockedId === d.id || (activeAsset === -1 && selIdx !== -1 && map[selIdx].id === d.id)) { ctx.strokeStyle = "#007aff"; ctx.lineWidth = (lockedId ? 1 : 3)/cam.z; const gx = Math.round(d.x), gy = Math.round(d.y), pS = toS(gx+a.gw, gy+a.gh), pW = toS(gx, gy+a.gh), pE = toS(gx+a.gw, gy), pN = toS(gx, gy); ctx.beginPath(); ctx.moveTo(pS.x,pS.y); ctx.lineTo(pW.x,pW.y); ctx.lineTo(pN.x,pN.y); ctx.lineTo(pE.x,pE.y); ctx.closePath(); ctx.stroke(); } }); sorted.forEach((d) => { if (!d.mem) return; const a = assets[d.aIdx]; if(!a) return; ctx.save(); const fVal = 9.5 * d.s, pVal = 3.2 * d.s, rVal = 2.2 * d.s; ctx.font = `bold ${fVal}px sans-serif`; const pos = toS(d.x + (a.gw / 2), d.y + (a.gh / 2)); const txtW = ctx.measureText(d.mem).width; const bgW = txtW + (pVal * 2), bgH = fVal + pVal; ctx.fillStyle = "rgba(0,0,0,0.8)"; ctx.beginPath(); ctx.roundRect(pos.x - bgW/2, pos.y - bgH/2, bgW, bgH, rVal); ctx.fill(); ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(d.mem, pos.x, pos.y); ctx.restore(); }); if(mode === 'pen' && penStart && penCurrent) { ctx.beginPath(); ctx.setLineDash([6/cam.z, 3/cam.z]); ctx.strokeStyle = "rgba(255, 0, 0, 0.8)"; ctx.lineWidth = 2/cam.z; const s = toS(penStart.x, penStart.y), e = toS(penCurrent.x, penCurrent.y); ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke(); } ctx.restore(); }
