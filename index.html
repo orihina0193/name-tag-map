@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.5.0</title>
+    <title>避難所レイアウト v29.5.1</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
         :root { --panel-h: 250px; --panel-w: 220px; }
@@ -34,16 +34,19 @@
         #nudge-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; width: 105px; flex-shrink: 0; }
         #nudge-grid button { height: 36px; font-size: 18px; border: 1px solid #ccc; background: #fff; border-radius: 6px; color: #007aff; }
         .mode-box { flex: 1; display: flex; flex-direction: column; gap: 4px; width: 100%; }
+        
+        .main-actions { display: flex; gap: 4px; width: 100%; }
+        .action-btn { flex: 1; height: 36px; font-size: 12px; font-weight: bold; border-radius: 6px; border: none; color: white; cursor: pointer; }
+        .btn-img { background: #34c759; }
+        .btn-save { background: #007aff; }
+        .btn-clr { background: #ff3b30; height: 26px; font-size: 10px; }
+
         .mode-row { display: flex; gap: 2px; align-items: center; }
         .mode-row button { flex: 1; height: 30px; font-size: 9px; font-weight: bold; border-radius: 5px; border: 1px solid #ccc; background: #fff; }
         .mode-row button.active { background: #007aff; color: #fff; }
         
         .lock-btn { width: 40px; height: 30px; font-size: 14px; border-radius: 5px; border: 1px solid #ff9500; background: #fff; color: #ff9500; font-weight: bold; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
         .lock-btn.locked { background: #ff9500; color: #fff; }
-
-        .data-btn { flex: 1; height: 30px; font-size: 10px; font-weight: bold; border-radius: 5px; border: none; color: white; cursor: pointer; }
-        .btn-clr { background: #ff3b30; }
-        .save-btn { height: 34px; font-size: 11px; background: #34c759; border: none; border-radius: 6px; color: white; font-weight: bold; width: 100%; cursor: pointer; }
 
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; display: none; align-items: center; justify-content: center; }
         .modal { width: 85%; max-height: 70%; background: #f8f9fa; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
@@ -81,10 +84,12 @@
     <div class="tool-section">
         <div id="nudge-grid" onclick="handleGuideClick('微調整', event)"><button style="grid-column:2" onclick="if(!guideMode)nudge(0,-0.1)">↑</button><button style="grid-column:1" onclick="if(!guideMode)nudge(-0.1,0)">←</button><button style="grid-column:2" onclick="if(!guideMode)nudge(0,0.1)">↓</button><button style="grid-column:3" onclick="if(!guideMode)nudge(0.1,0)">→</button></div>
         <div class="mode-box">
-            <button class="save-btn" onclick="handleGuideClick('画像保存', event) || exportImage()">画像として保存</button>
-            <button id="server-save-btn" class="save-btn" style="background: #007aff; margin-top: 3px; display: none;" onclick="saveToCloud()">この部屋に保存</button>
-            <button class="data-btn btn-clr" style="width: 100%; margin-top: 3px;" onclick="handleGuideClick('全消去', event) || clearAll()">全消去</button>
-            <div class="mode-row" onclick="handleGuideClick('モード切替', event)" style="margin-top: 3px;">
+            <div class="main-actions">
+                <button class="action-btn btn-img" onclick="handleGuideClick('画像保存', event) || exportImage()">画像保存</button>
+                <button id="server-save-btn" class="action-btn btn-save" style="display: none;" onclick="saveToCloud()">部屋に保存</button>
+            </div>
+            <button class="action-btn btn-clr" onclick="handleGuideClick('全消去', event) || clearAll()">全消去</button>
+            <div class="mode-row" onclick="handleGuideClick('モード切替', event)">
                 <button id="lock-toggle" class="lock-btn" onclick="if(!guideMode)toggleEditLock()" title="編集ロック">🔓</button>
                 <button id="m-move" onclick="if(!guideMode)setMode('move')">移動</button>
                 <button id="m-pen" onclick="if(!guideMode)setMode('pen')">ペン</button>
@@ -98,11 +103,10 @@
 <div id="export-overlay" onclick="this.style.display='none'"><img id="export-img"></div>
 
 <script>
-// ⚠️ 完全に登録不要・ログイン不要で全世界のWebツールから使われている無料API
 const API_ENDPOINT = "https://api.restful-api.dev/objects";
 
 let currentRoomName = null;
-let cloudObjectId = null; // サーバー上の固有データID
+let cloudObjectId = null;
 let guideMode = false, isEditLocked = false;
 const GUIDE_TEXT = {
     '選択解除': '現在選んでいる建物を解除します。',
@@ -148,7 +152,6 @@ function init() {
     if (currentRoomName) {
         document.getElementById('room-badge').innerText = `部屋: ${currentRoomName}`;
         document.getElementById('server-save-btn').style.display = 'block';
-        // 過去にこの部屋のIDをブラウザが記憶していればそこから読み込む
         cloudObjectId = localStorage.getItem(`cloud_id_${currentRoomName}`);
     }
 
@@ -162,11 +165,8 @@ function init() {
     }); 
     setupEvents(); }
 
-// サーバーからデータを読み込む
 function loadFromCloud() {
     showStatus("読み込み中...", "#ff9500");
-    
-    // 部屋名に紐づくデータIDがない場合は、新規部屋として扱う
     if (!cloudObjectId) {
         showStatus("新しい部屋です", "#007aff");
         load();
@@ -188,13 +188,11 @@ function loadFromCloud() {
         }
     })
     .catch(err => {
-        console.log("新規部屋、または古いキャッシュです");
         showStatus("データ未作成", "#8e8e93");
         load();
     });
 }
 
-// サーバーへデータを保存する
 function saveToCloud() {
     if (!currentRoomName) return;
     deselect();
@@ -209,7 +207,6 @@ function saveToCloud() {
         data: { compressed: compressedStr }
     };
 
-    // すでにIDがあるならPUT(更新)、ないならPOST(新規作成)
     const method = cloudObjectId ? 'PUT' : 'POST';
     const url = cloudObjectId ? `${API_ENDPOINT}/${cloudObjectId}` : API_ENDPOINT;
 
@@ -222,16 +219,16 @@ function saveToCloud() {
     .then(json => {
         if(json.id) {
             cloudObjectId = json.id;
-            localStorage.setItem(`cloud_id_${currentRoomName}`, json.id); // 次回以降のためにIDを保存
+            localStorage.setItem(`cloud_id_${currentRoomName}`, json.id);
             showStatus("部屋に保存しました！", "#34c759");
-            save(); // スマホ本体にもバックアップ
+            save();
             alert(`【${currentRoomName}】の部屋データを保存しました！\n同じURLを開いている人全員に同期されます。`);
         }
     })
     .catch(err => {
         console.error(err);
         showStatus("保存エラー", "#ff3b30");
-        alert("通信エラーが発生しました。本体の保存領域に一時保存します。");
+        alert("通信エラーが発生しました。本体に保存します。");
         save();
     });
 }
