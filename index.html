@@ -6,7 +6,7 @@
     <title>避難所レイアウト v29.5.3</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
-        :root { --panel-h: 280px; }
+        :root { --panel-h: 250px; --panel-w: 220px; }
         body { margin: 0; overflow: hidden; background: #e0e5ec; font-family: sans-serif; touch-action: none; position: fixed; width: 100%; height: 100%; display: flex; flex-direction: column; }
         #main-container { flex: 1; position: relative; overflow: hidden; }
         canvas { display: block; background: #f0f0f0; width: 100%; height: 100%; cursor: crosshair; }
@@ -25,64 +25,82 @@
         .top-btn { width: 44px; height: 50px; border-radius: 8px; border: 1px solid #ccc; background: #fff; font-size: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; }
         .reload-btn { height: 50px; width: 44px; border-radius: 8px; border: 1px solid #ff9500; background: #fff; color: #ff9500; font-size: 20px; font-weight: bold; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; }
 
-        #bot-panel { background: rgba(255,255,255,0.98); border-top: 1px solid #ccc; padding: 10px; box-sizing: border-box; z-index: 100; display: flex; flex-direction: column; gap: 8px; height: var(--panel-h); }
-        .row { display: flex; align-items: center; gap: 8px; }
-        .row label { font-size: 10px; font-weight: bold; width: 24px; flex-shrink: 0; color: #666; }
+        #bot-panel { background: rgba(255,255,255,0.98); border-top: 1px solid #ccc; padding: 8px 10px; box-sizing: border-box; z-index: 100; display: flex; flex-direction: column; gap: 6px; height: var(--panel-h); }
+        .row { display: flex; align-items: center; gap: 5px; }
+        .row label { font-size: 10px; font-weight: bold; width: 12px; flex-shrink: 0; text-align: center; }
         input[type="range"] { flex: 1; height: 32px; cursor: pointer; }
-        .prec-btn { width: 36px; height: 36px; font-size: 18px; border: 1px solid #ccc; background: #fff; border-radius: 8px; color: #007aff; cursor: pointer; }
+        .prec-btn { width: 22px; height: 38px; font-size: 18px; border: 1px solid #dcdcdc; background: #fff; border-radius: 5px; color: #007aff; cursor: pointer; flex-shrink: 0; }
+        .tool-section { display: flex; justify-content: space-between; gap: 5px; width: 100%; }
+        #nudge-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; width: 105px; flex-shrink: 0; }
+        #nudge-grid button { height: 36px; font-size: 18px; border: 1px solid #ccc; background: #fff; border-radius: 6px; color: #007aff; }
+        .mode-box { flex: 1; display: flex; flex-direction: column; gap: 4px; width: 100%; }
         
-        .action-area { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .action-btn { height: 44px; font-size: 13px; font-weight: bold; border-radius: 8px; border: none; color: white; cursor: pointer; }
+        .main-actions { display: flex; gap: 4px; width: 100%; }
+        .action-btn { flex: 1; height: 36px; font-size: 12px; font-weight: bold; border-radius: 6px; border: none; color: white; cursor: pointer; }
         .btn-img { background: #34c759; }
         .btn-save { background: #007aff; }
+        .btn-clr { background: #ff3b30; height: 26px; font-size: 10px; }
+
+        .mode-row { display: flex; gap: 2px; align-items: center; }
+        .mode-row button { flex: 1; height: 30px; font-size: 9px; font-weight: bold; border-radius: 5px; border: 1px solid #ccc; background: #fff; }
+        .mode-row button.active { background: #007aff; color: #fff; }
         
-        .btn-clr { background: #ff3b30; height: 40px; font-size: 13px; font-weight: bold; border-radius: 8px; border: none; color: white; cursor: pointer; margin-top: 4px; }
-        
-        .mode-row { display: grid; grid-template-columns: 40px repeat(4, 1fr); gap: 4px; align-items: center; margin-top: 4px; }
-        .mode-row button { height: 40px; font-size: 11px; font-weight: bold; border-radius: 6px; border: 1px solid #ccc; background: #fff; }
-        .mode-row button.active { background: #007aff; color: #fff; border-color: #007aff; }
-        
-        .lock-btn { font-size: 18px; border-radius: 6px; border: 1px solid #ff9500; background: #fff; color: #ff9500; }
+        .lock-btn { width: 40px; height: 30px; font-size: 14px; border-radius: 5px; border: 1px solid #ff9500; background: #fff; color: #ff9500; font-weight: bold; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
         .lock-btn.locked { background: #ff9500; color: #fff; }
 
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; display: none; align-items: center; justify-content: center; }
-        .modal { width: 90%; max-height: 80%; background: #fff; border-radius: 16px; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
+        .modal { width: 85%; max-height: 70%; background: #f8f9fa; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
+        .modal-title { font-size: 16px; font-weight: bold; color: #333; border-bottom: 2px solid #007aff; padding-bottom: 5px; }
+        #mem-list { overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+        .mem-item { padding: 12px; background: #fff; border: 1px solid #eee; border-radius: 8px; font-size: 14px; display: flex; justify-content: space-between; align-items: center; }
+        #asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 10px; overflow-y: auto; }
+        .thumb { width: 60px; height: 60px; border-radius: 8px; border: 2px solid #ccc; background-size: contain; background-repeat: no-repeat; background-position: center; background-color: #fff; cursor: pointer; }
+        #export-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 3000; display: none; flex-direction: column; align-items: center; justify-content: center; }
+        #export-img { max-width: 90%; max-height: 75%; border: 2px solid #fff; }
     </style>
 </head>
 <body>
 <div id="main-container">
     <canvas id="cvs"></canvas>
-    <div id="room-badge">部屋: 未指定</div>
+    <div id="room-badge">部屋: 未指定 (ローカル)</div>
     <div id="sync-status">同期中...</div>
     <div id="guide-trigger" onclick="toggleGuideMode()">?</div>
-    <div id="guide-msg-box">ガイドモード</div>
+    <div id="guide-msg-box">ガイドモード：ボタンをタップして説明を表示</div>
     <div id="top-panel">
-        <div id="cur-box" onclick="deselect()" title="選択解除"></div>
-        <input type="text" id="member-name-in" placeholder="ギルメン名" oninput="updateMemberName(this.value)">
-        <button class="top-btn" onclick="openMemberList()" title="名簿">👥</button>
-        <button class="top-btn" onclick="toggleAssetModal(true)" title="素材">＋</button>
-        <button class="reload-btn" onclick="location.reload()" title="リセット">🔄</button>
+        <div id="cur-box" onclick="handleGuideClick('選択解除', event) || deselect()" title="選択解除"></div>
+        <input type="text" id="member-name-in" placeholder="ギルメン名を入力" oninput="updateMemberName(this.value)" onclick="if(guideMode){ handleGuideClick('ギルメン名', event); this.blur(); }">
+        <button class="top-btn" onclick="handleGuideClick('名簿', event) || openMemberList()" title="名簿">👥</button>
+        <button class="top-btn" onclick="handleGuideClick('素材追加', event) || toggleAssetModal(true)" title="素材追加">＋</button>
+        <button class="reload-btn" onclick="handleGuideClick('リセット', event) || location.reload()" title="リセット">🔄</button>
     </div>
 </div>
+
+<div id="mem-overlay" class="overlay" onclick="if(event.target==this)this.style.display='none'"><div class="modal"><div class="modal-title">配置済みメンバー一覧</div><div id="mem-list"></div></div></div>
+<div id="asset-overlay" class="overlay" onclick="if(event.target==this)toggleAssetModal(false)"><div class="modal"><div class="modal-title">建物素材</div><div id="asset-grid"><label style="width:60px; height:60px; border:2px dashed #bbb; border-radius:8px; display:flex; justify-content:center; align-items:center; font-size:24px; color:#999; background:#fff; cursor:pointer;"><input type="file" id="img-in" hidden accept="image/*" multiple onchange="handleFiles(this.files)">📁</label></div></div></div>
 
 <div id="bot-panel">
-    <div class="row"><label>サイズ</label><button class="prec-btn" onclick="adjS(-0.05)">-</button><input type="range" id="size-s" min="0.1" max="5" step="0.05"><button class="prec-btn" onclick="adjS(0.05)">+</button></div>
-    <div class="row"><label>接地</label><button class="prec-btn" onclick="adjO(-1)">-</button><input type="range" id="off-s" min="-100" max="100" step="1"><button class="prec-btn" onclick="adjO(1)">+</button></div>
-    
-    <div class="action-area">
-        <button class="action-btn btn-img" onclick="exportImage()">画像保存</button>
-        <button class="action-btn btn-save" onclick="saveToCloud()">部屋に保存</button>
-    </div>
-    <button class="btn-clr" onclick="clearAll()">配置を全消去</button>
-
-    <div class="mode-row">
-        <button id="lock-toggle" class="lock-btn" onclick="toggleEditLock()">🔓</button>
-        <button id="m-move" onclick="setMode('move')">移動</button>
-        <button id="m-pen" onclick="setMode('pen')">ペン</button>
-        <button id="m-p-erase" onclick="setMode('p-erase')">線消</button>
-        <button id="m-erase" onclick="setMode('erase')">建物消</button>
+    <div class="row" onclick="handleGuideClick('サイズ調整', event)"><label>サイズ</label><button class="prec-btn" onclick="if(!guideMode)adjS(-0.05)">-</button><input type="range" id="size-s" min="0.1" max="5" step="0.05" onmousedown="if(guideMode)event.preventDefault()" ontouchstart="if(guideMode)event.preventDefault()"><button class="prec-btn" onclick="if(!guideMode)adjS(0.05)">+</button></div>
+    <div class="row" onclick="handleGuideClick('接地調整', event)"><label>接地</label><button class="prec-btn" onclick="if(!guideMode)adjO(-1)">-</button><input type="range" id="off-s" min="-100" max="100" step="1" onmousedown="if(guideMode)event.preventDefault()" ontouchstart="if(guideMode)event.preventDefault()"><button class="prec-btn" onclick="if(!guideMode)adjO(1)">+</button></div>
+    <div class="tool-section">
+        <div id="nudge-grid" onclick="handleGuideClick('微調整', event)"><button style="grid-column:2" onclick="if(!guideMode)nudge(0,-0.1)">↑</button><button style="grid-column:1" onclick="if(!guideMode)nudge(-0.1,0)">←</button><button style="grid-column:2" onclick="if(!guideMode)nudge(0,0.1)">↓</button><button style="grid-column:3" onclick="if(!guideMode)nudge(0.1,0)">→</button></div>
+        <div class="mode-box">
+            <div class="main-actions">
+                <button class="action-btn btn-img" onclick="handleGuideClick('画像保存', event) || exportImage()">画像保存</button>
+                <button id="server-save-btn" class="action-btn btn-save" onclick="saveToCloud()">部屋に保存</button>
+            </div>
+            <button class="action-btn btn-clr" onclick="handleGuideClick('全消去', event) || clearAll()">全消去</button>
+            <div class="mode-row" onclick="handleGuideClick('モード切替', event)">
+                <button id="lock-toggle" class="lock-btn" onclick="if(!guideMode)toggleEditLock()" title="編集ロック">🔓</button>
+                <button id="m-move" onclick="if(!guideMode)setMode('move')">移動</button>
+                <button id="m-pen" onclick="if(!guideMode)setMode('pen')">ペン</button>
+                <button id="m-p-erase" onclick="if(!guideMode)setMode('p-erase')">線消</button>
+                <button id="m-erase" onclick="if(!guideMode)setMode('erase')">建物消</button>
+            </div>
+        </div>
     </div>
 </div>
+
+<div id="export-overlay" onclick="this.style.display='none'"><img id="export-img"></div>
 
 <script>
 // ここを自身のGASのURLに書き換えてください
