@@ -103,10 +103,10 @@
 <div id="export-overlay" onclick="this.style.display='none'"><img id="export-img"></div>
 
 <script>
-const API_ENDPOINT = "https://api.restful-api.dev/objects";
+// ここを自身のGASのURLに書き換えてください
+const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzQOcpj6K247JSfRYxy40hHzCiTPt5MYEbvNKT6S33KZ3Ncp1XzzOXkePn4rAMuki0Y/exec";
 
 let currentRoomName = null;
-let cloudObjectId = null;
 let guideMode = false, isEditLocked = false;
 const GUIDE_TEXT = {
     '選択解除': '現在選んでいる建物を解除します。',
@@ -151,7 +151,6 @@ function init() {
     
     if (currentRoomName) {
         document.getElementById('room-badge').innerText = `部屋: ${currentRoomName}`;
-        cloudObjectId = localStorage.getItem(`cloud_id_${currentRoomName}`);
     }
 
     loadPresets().then(() => { 
@@ -165,43 +164,35 @@ function init() {
     setupEvents(); }
 
 function loadFromCloud() {
-    showStatus("読み込み中...", "#ff9500");
-    if (!cloudObjectId) {
-        showStatus("新しい部屋です", "#007aff");
-        load();
-        return;
-    }
+    if (!currentRoomName) { load(); return; }
+    showStatus("サーバーから読込中...", "#ff9500");
 
-    fetch(`${API_ENDPOINT}/${cloudObjectId}`)
-    .then(res => {
-        if(!res.ok) throw new Error("Not Found");
-        return res.json();
-    })
-    .then(json => {
-        if (json.data && json.data.str) {
-            const d = JSON.parse(LZString.decompressFromEncodedURIComponent(json.data.str));
+    fetch(`${API_ENDPOINT}?room=${encodeURIComponent(currentRoomName)}`)
+    .then(res => res.text())
+    .then(text => {
+        if (text && text.trim() !== "") {
+            const d = JSON.parse(LZString.decompressFromEncodedURIComponent(text));
             map = d.m || [];
             lines = d.l || [];
             render();
-            showStatus("最新データ同期完了", "#34c759");
+            showStatus("同期完了", "#34c759");
+        } else {
+            showStatus("新規データです", "#007aff");
+            load();
         }
     })
     .catch(err => {
-        showStatus("データ未作成", "#8e8e93");
+        showStatus("読込失敗", "#ff3b30");
         load();
     });
 }
 
 function saveToCloud() {
     if (!currentRoomName) {
-        const inputName = prompt("データを保存する新しい部屋名を入力してください（例: orange）\n※ここで決めた部屋名がそのままみんなに配るURLになります。");
-        if (!inputName || inputName.trim() === "") {
-            alert("部屋名が空欄のため、保存をキャンセルしました。");
-            return;
-        }
+        const inputName = prompt("部屋名を入力してください（例: orange）");
+        if (!inputName || inputName.trim() === "") return;
         currentRoomName = inputName.trim();
         document.getElementById('room-badge').innerText = `部屋: ${currentRoomName}`;
-        
         const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?room=' + currentRoomName;
         window.history.replaceState({path:newUrl}, '', newUrl);
     }
@@ -213,42 +204,19 @@ function saveToCloud() {
     const rawStr = JSON.stringify({m: map, l: lines});
     const compressedStr = LZString.compressToEncodedURIComponent(rawStr);
 
-    const payload = {
-        name: `room_${currentRoomName}`,
-        data: { str: compressedStr }
-    };
-
-    const method = cloudObjectId ? 'PUT' : 'POST';
-    const url = cloudObjectId ? `${API_ENDPOINT}/${cloudObjectId}` : API_ENDPOINT;
-
-    fetch(url, {
-        method: method,
+    fetch(API_ENDPOINT, {
+        method: 'POST',
+        mode: 'no-cors',
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ room: currentRoomName, str: compressedStr })
     })
-    .then(res => {
-        if(!res.ok) throw new Error("Server Error");
-        return res.json();
-    })
-    .then(json => {
-        if(json.id) {
-            cloudObjectId = json.id;
-            localStorage.setItem(`cloud_id_${currentRoomName}`, json.id);
-            showStatus("部屋に保存しました！", "#34c759");
-            save(); 
-            
-            const shareUrl = window.location.href;
-            navigator.clipboard.writeText(shareUrl).then(() => {
-                alert(`【${currentRoomName}】の部屋データをサーバーに保存しました！\n\n共有用URLをコピーしましたので、そのままLINEやDiscordに貼り付けられます。`);
-            }).catch(() => {
-                alert(`【${currentRoomName}】の部屋データを保存しました！\n\nブラウザのURLをコピーして共有してください。`);
-            });
-        }
+    .then(() => {
+        showStatus("保存完了！", "#34c759");
+        save();
     })
     .catch(err => {
-        console.error(err);
         showStatus("保存エラー", "#ff3b30");
-        alert("通信保存に失敗しました。お使いの端末（ブラウザ）へバックアップとして保存します。");
+        alert("サーバー保存に失敗しました。");
         save();
     });
 }
