@@ -39,7 +39,6 @@
         .lock-btn.locked { background: #ff9500; color: #fff; }
 
         .data-btn { flex: 1; height: 30px; font-size: 10px; font-weight: bold; border-radius: 5px; border: none; color: white; cursor: pointer; }
-        .btn-out { background: #5856d6; }
         .btn-clr { background: #ff3b30; }
         .save-btn { height: 34px; font-size: 11px; background: #34c759; border: none; border-radius: 6px; color: white; font-weight: bold; width: 100%; cursor: pointer; }
 
@@ -78,8 +77,8 @@
         <div id="nudge-grid" onclick="handleGuideClick('微調整', event)"><button style="grid-column:2" onclick="if(!guideMode)nudge(0,-0.1)">↑</button><button style="grid-column:1" onclick="if(!guideMode)nudge(-0.1,0)">←</button><button style="grid-column:2" onclick="if(!guideMode)nudge(0,0.1)">↓</button><button style="grid-column:3" onclick="if(!guideMode)nudge(0.1,0)">→</button></div>
         <div class="mode-box">
             <button class="save-btn" onclick="handleGuideClick('画像保存', event) || exportImage()">画像として保存</button>
-            <div style="display:flex; gap:3px;"><button class="data-btn btn-out" onclick="handleGuideClick('共有URL', event) || exportURL()">共有URL</button><button class="data-btn btn-clr" onclick="handleGuideClick('全消去', event) || clearAll()">全消去</button></div>
-            <div class="mode-row" onclick="handleGuideClick('モード切替', event)">
+            <button class="data-btn btn-clr" style="width: 100%; margin-top: 3px;" onclick="handleGuideClick('全消去', event) || clearAll()">全消去</button>
+            <div class="mode-row" onclick="handleGuideClick('モード切替', event)" style="margin-top: 3px;">
                 <button id="lock-toggle" class="lock-btn" onclick="if(!guideMode)toggleEditLock()" title="編集ロック">🔓</button>
                 <button id="m-move" onclick="if(!guideMode)setMode('move')">移動</button>
                 <button id="m-pen" onclick="if(!guideMode)setMode('pen')">ペン</button>
@@ -106,7 +105,6 @@ const GUIDE_TEXT = {
     '接地調整': '建物の重なり順や、マスの接地位置を上下に微調整します。',
     '微調整': '矢印ボタンで、建物をドット単位で細かく動かします。',
     '画像保存': '現在見えているキャンバスの画像を保存します。',
-    '共有URL': '今の状態をURLにしてコピーします。他の人への共有や 編集の続きができます。',
     '全消去': 'すべての建物と線を消して空にします。',
     'モード切替': '移動、ペン（赤い線）、消しゴムのモードを切り替えます。🔓は編集ロックのON/OFFです。'
 };
@@ -128,24 +126,12 @@ function handleGuideClick(key, event) {
     return true;
 }
 
-// 修正箇所：ロック解除時に確認ポップアップを表示
 function toggleEditLock() {
-    if (isEditLocked) {
-        if (!confirm("閲覧モードを解除しますか？")) {
-            return;
-        }
-    }
-
+    if (isEditLocked) { if (!confirm("閲覧モードを解除しますか？")) return; }
     isEditLocked = !isEditLocked;
     const btn = document.getElementById('lock-toggle');
-    if (isEditLocked) {
-        btn.classList.add('locked');
-        btn.innerText = '🔒';
-        deselect();
-    } else {
-        btn.classList.remove('locked');
-        btn.innerText = '🔓';
-    }
+    if (isEditLocked) { btn.classList.add('locked'); btn.innerText = '🔒'; deselect(); }
+    else { btn.classList.remove('locked'); btn.innerText = '🔓'; }
 }
 
 const PRESETS = [
@@ -190,11 +176,7 @@ function exportImage() { deselect(); render(); const tempCvs = document.createEl
 function handleStart(x, y) {
     if (guideMode) return;
     const rawG = toG(x, y), gx_o = Math.floor(rawG.x), gy_o = Math.floor(rawG.y), gx_p = Math.round(rawG.x), gy_p = Math.round(rawG.y);
-    if (isEditLocked) {
-        selIdx = -1; lockedId = null; drag = true; updateCurBox(); render();
-        return;
-    }
-
+    if (isEditLocked) { selIdx = -1; lockedId = null; drag = true; updateCurBox(); render(); return; }
     if(mode === 'pen') { penStart = {x:gx_p, y:gy_p}; penCurrent = {x:gx_p, y:gy_p}; render(); return; }
     if(mode === 'p-erase') { const distToSeg = (p, v, w) => { const l2 = Math.pow(v.x-w.x,2) + Math.pow(v.y-w.y,2); if(l2 === 0) return Math.hypot(p.x-v.x, p.y-v.y); let t = Math.max(0, Math.min(1, ((p.x-v.x)*(w.x-v.x) + (p.y-v.y)*(w.y-v.y)) / l2)); return Math.hypot(p.x-(v.x+t*(w.x-v.x)), p.y-(v.y+t*(w.y-v.y))); }; lines = lines.filter(l => distToSeg(rawG, {x:l.x1, y:l.y1}, {x:l.x2, y:l.y2}) > 0.5); save(); render(); return; }
     let hitIdx = map.findLastIndex(d => { const a = assets[d.aIdx]; return rawG.x >= d.x && rawG.x < d.x + a.gw && rawG.y >= d.y && rawG.y < d.y + a.gh; });
@@ -248,32 +230,6 @@ function adjO(v) { if(isEditLocked) return; if(selIdx!==-1){ map[selIdx].off+=v;
 function nudge(dx,dy) { if(isEditLocked) return; if(selIdx!==-1){ map[selIdx].ox=parseFloat((map[selIdx].ox+dx).toFixed(2)); map[selIdx].oy=parseFloat((map[selIdx].oy+dy).toFixed(2)); save(); render(); } }
 function clearAll() { if(isEditLocked) return; if(confirm("配置をすべて消去しますか？")){ map=[]; lines=[]; selIdx=-1; lockedId=null; save(); updateCurBox(); render(); } }
 
-async function exportURL() {
-    const exportMap = map.map(d => {
-        const a = assets[d.aIdx];
-        return { n: a.name || null, x: d.x, y: d.y, s: d.s, off: d.off, ox: d.ox, oy: d.oy, mem: d.mem, src: a.name ? null : a.src };
-    });
-    
-    const compressed = LZString.compressToEncodedURIComponent(JSON.stringify({ 
-        m: exportMap, 
-        l: lines,
-        locked: isEditLocked
-    }));
-    
-    const fullUrl = window.location.href.split('?')[0] + "?d=" + compressed;
-    
-    try {
-        const res = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(fullUrl)}`);
-        const shortUrl = await res.text();
-        
-        navigator.clipboard.writeText(shortUrl);
-        alert(isEditLocked ? "閲覧専用の短縮URLをコピーしました" : "編集可能の短縮URLをコピーしました");
-    } catch (e) {
-        navigator.clipboard.writeText(fullUrl);
-        alert("短縮に失敗したため、フルURLをコピーしました。");
-    }
-}
-
 function applyData(code) {
     try {
         const json = LZString.decompressFromEncodedURIComponent(code);
@@ -282,20 +238,14 @@ function applyData(code) {
         map = d.m.map(item => {
             let aIdx = assets.findIndex(a => a.name === item.n);
             if(aIdx === -1 && item.src) {
-                const img = new Image();
-                img.src = item.src;
+                const img = new Image(); img.src = item.src;
                 assets.push({ img, src: item.src, name: null, defS: 1, defO: 0, gw: 1, gh: 1, ox: 0, oy: 0 });
-                addThumb(assets.length - 1);
-                aIdx = assets.length - 1;
+                addThumb(assets.length - 1); aIdx = assets.length - 1;
             }
             return { id: Date.now()+Math.random(), x: item.x, y: item.y, aIdx: aIdx===-1?0:aIdx, s: item.s, off: item.off, ox: item.ox, oy: item.oy, mem: item.mem || "" };
         });
-        save();
-        render();
-
-        if (d.locked) {
-            if(!isEditLocked) toggleEditLock();
-        }
+        save(); render();
+        if (d.locked) { if(!isEditLocked) toggleEditLock(); }
     } catch(e) {}
 }
 
