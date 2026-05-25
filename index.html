@@ -77,6 +77,7 @@
         <div id="nudge-grid" onclick="handleGuideClick('微調整', event)"><button style="grid-column:2" onclick="if(!guideMode)nudge(0,-0.1)">↑</button><button style="grid-column:1" onclick="if(!guideMode)nudge(-0.1,0)">←</button><button style="grid-column:2" onclick="if(!guideMode)nudge(0,0.1)">↓</button><button style="grid-column:3" onclick="if(!guideMode)nudge(0.1,0)">→</button></div>
         <div class="mode-box">
             <button class="save-btn" onclick="handleGuideClick('画像保存', event) || exportImage()">画像として保存</button>
+            <button class="save-btn" style="background: #007aff; margin-top: 3px;" onclick="saveToDrive()">ドライブに保存</button>
             <button class="data-btn btn-clr" style="width: 100%; margin-top: 3px;" onclick="handleGuideClick('全消去', event) || clearAll()">全消去</button>
             <div class="mode-row" onclick="handleGuideClick('モード切替', event)" style="margin-top: 3px;">
                 <button id="lock-toggle" class="lock-btn" onclick="if(!guideMode)toggleEditLock()" title="編集ロック">🔓</button>
@@ -178,6 +179,16 @@ function init() {
         render(); 
     }); 
     setupEvents(); 
+}
+
+function saveToDrive() {
+    const params = new URLSearchParams(window.location.search);
+    const driveParam = params.get('room');
+    if (!driveParam) { alert("保存先（room）が指定されていません！"); return; }
+    const driveId = getDriveId(driveParam);
+    const saveData = LZString.compressToEncodedURIComponent(JSON.stringify({m: map, l: lines}));
+    console.log("保存開始", "\nID:", driveId, "\nデータ:", saveData);
+    alert("保存準備完了（コンソールを確認してください）");
 }
 
 function zoom(scaleChange, centerX, centerY) { const newZ = Math.min(Math.max(cam.z * scaleChange, 0.1), 5); const ratio = newZ / cam.z; cam.x = centerX - (centerX - cam.x) * ratio; cam.y = centerY - (centerY - cam.y) * ratio; cam.z = newZ; }
