@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.5.1</title>
+    <title>避難所レイアウト v29.5.2</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
         :root { --panel-h: 250px; --panel-w: 220px; }
@@ -86,7 +86,7 @@
         <div class="mode-box">
             <div class="main-actions">
                 <button class="action-btn btn-img" onclick="handleGuideClick('画像保存', event) || exportImage()">画像保存</button>
-                <button id="server-save-btn" class="action-btn btn-save" style="display: none;" onclick="saveToCloud()">部屋に保存</button>
+                <button id="server-save-btn" class="action-btn btn-save" onclick="saveToCloud()">部屋に保存</button>
             </div>
             <button class="action-btn btn-clr" onclick="handleGuideClick('全消去', event) || clearAll()">全消去</button>
             <div class="mode-row" onclick="handleGuideClick('モード切替', event)">
@@ -151,7 +151,6 @@ function init() {
     
     if (currentRoomName) {
         document.getElementById('room-badge').innerText = `部屋: ${currentRoomName}`;
-        document.getElementById('server-save-btn').style.display = 'block';
         cloudObjectId = localStorage.getItem(`cloud_id_${currentRoomName}`);
     }
 
@@ -194,7 +193,21 @@ function loadFromCloud() {
 }
 
 function saveToCloud() {
-    if (!currentRoomName) return;
+    // 部屋名が未指定の場合、その場で部屋名を入力してもらう
+    if (!currentRoomName) {
+        const inputName = prompt("データを保存する新しい部屋名を入力してください（例: orange）\n※ここで決めた部屋名がそのままみんなに配るURLになります。");
+        if (!inputName || inputName.trim() === "") {
+            alert("部屋名が空欄のため、保存をキャンセルしました。");
+            return;
+        }
+        currentRoomName = inputName.trim();
+        document.getElementById('room-badge').innerText = `部屋: ${currentRoomName}`;
+        
+        // ブラウザのURL表示を入力された部屋名に書き換える（安全に履歴を上書き）
+        const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?room=' + currentRoomName;
+        window.history.replaceState({path:newUrl}, '', newUrl);
+    }
+
     deselect();
     render();
     showStatus("保存中...", "#ff9500");
@@ -221,8 +234,15 @@ function saveToCloud() {
             cloudObjectId = json.id;
             localStorage.setItem(`cloud_id_${currentRoomName}`, json.id);
             showStatus("部屋に保存しました！", "#34c759");
-            save();
-            alert(`【${currentRoomName}】の部屋データを保存しました！\n同じURLを開いている人全員に同期されます。`);
+            save(); // 本体のバックアップも更新
+            
+            // 共有用URLをクリップボードに自動コピーしてあげる親切機能
+            const shareUrl = window.location.href;
+            navigator.clipboard.writeText(shareUrl).then(() => {
+                alert(`【${currentRoomName}】の部屋データをサーバーに保存しました！\n\n他メンバー共有用のURLをクリップボードにコピーしました。そのままLINEやDiscordに貼り付けて配れます！`);
+            }).catch(() => {
+                alert(`【${currentRoomName}】の部屋データを保存しました！\n\n今のブラウザのURL（末尾に ?room=${currentRoomName} がついたもの）をコピーして共有してください。`);
+            });
         }
     })
     .catch(err => {
