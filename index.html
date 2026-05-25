@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.4.0 (B案オンライン版)</title>
+    <title>避難所レイアウト v29.5.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
         :root { --panel-h: 250px; --panel-w: 220px; }
@@ -11,9 +11,8 @@
         #main-container { flex: 1; position: relative; overflow: hidden; }
         canvas { display: block; background: #f0f0f0; width: 100%; height: 100%; cursor: crosshair; }
         
-        /* 部屋情報表示 */
         #room-badge { position: absolute; top: 75px; left: 15px; background: rgba(0,0,0,0.7); color: #fff; padding: 6px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; z-index: 500; pointer-events: none; }
-        #sync-status { position: absolute; top: 75px; left: 140px; background: #34c759; color: #fff; padding: 6px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; z-index: 500; display: none; }
+        #sync-status { position: absolute; top: 75px; right: 65px; background: #34c759; color: #fff; padding: 6px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; z-index: 500; display: none; }
 
         #guide-trigger { position: absolute; top: 75px; right: 15px; width: 40px; height: 40px; background: rgba(0,122,255,0.9); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 20px; z-index: 500; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); border: 2px solid #fff; }
         #guide-trigger.active { background: #ff3b30; }
@@ -60,7 +59,7 @@
 <body>
 <div id="main-container">
     <canvas id="cvs"></canvas>
-    <div id="room-badge">部屋: 未指定 (ローカル保存)</div>
+    <div id="room-badge">部屋: 未指定 (ローカル)</div>
     <div id="sync-status">同期中...</div>
     <div id="guide-trigger" onclick="toggleGuideMode()">?</div>
     <div id="guide-msg-box">ガイドモード：ボタンをタップして説明を表示</div>
@@ -83,7 +82,7 @@
         <div id="nudge-grid" onclick="handleGuideClick('微調整', event)"><button style="grid-column:2" onclick="if(!guideMode)nudge(0,-0.1)">↑</button><button style="grid-column:1" onclick="if(!guideMode)nudge(-0.1,0)">←</button><button style="grid-column:2" onclick="if(!guideMode)nudge(0,0.1)">↓</button><button style="grid-column:3" onclick="if(!guideMode)nudge(0.1,0)">→</button></div>
         <div class="mode-box">
             <button class="save-btn" onclick="handleGuideClick('画像保存', event) || exportImage()">画像として保存</button>
-            <button id="server-save-btn" class="save-btn" style="background: #007aff; margin-top: 3px; display: none;" onclick="saveToCloud()">この部屋に保存保存</button>
+            <button id="server-save-btn" class="save-btn" style="background: #007aff; margin-top: 3px; display: none;" onclick="saveToCloud()">この部屋に保存</button>
             <button class="data-btn btn-clr" style="width: 100%; margin-top: 3px;" onclick="handleGuideClick('全消去', event) || clearAll()">全消去</button>
             <div class="mode-row" onclick="handleGuideClick('モード切替', event)" style="margin-top: 3px;">
                 <button id="lock-toggle" class="lock-btn" onclick="if(!guideMode)toggleEditLock()" title="編集ロック">🔓</button>
@@ -99,12 +98,11 @@
 <div id="export-overlay" onclick="this.style.display='none'"><img id="export-img"></div>
 
 <script>
-// ⚠️ 全ギルド共通のデータ保存倉庫API（サンプルのパブリックリポジトリ）
-// ※実用時はあなたの独自のデータサーバーか、JSONBin等の無料エンドポイントURLに差し替え可能です
-const API_URL = "https://api.jsonbin.io/v3/b"; 
-const MASTER_KEY = "$2a$10$SampleKeyReplaceThisWithYourActualKey"; // 読み書き用キー（必要に応じて設定）
+// ⚠️ 完全に登録不要・ログイン不要で全世界のWebツールから使われている無料API
+const API_ENDPOINT = "https://api.restful-api.dev/objects";
 
 let currentRoomName = null;
+let cloudObjectId = null; // サーバー上の固有データID
 let guideMode = false, isEditLocked = false;
 const GUIDE_TEXT = {
     '選択解除': '現在選んでいる建物を解除します。',
@@ -144,13 +142,14 @@ let drag = false, pinch = false, lockedId = null, penStart = null, penCurrent = 
 function init() { 
     window.addEventListener('resize', resize); resize(); cam.x = cvs.width/2; cam.y = cvs.height/3; 
     
-    // URLの後ろにある「?room=部屋名」を自動チェック
     const params = new URLSearchParams(window.location.search);
     currentRoomName = params.get('room');
     
     if (currentRoomName) {
         document.getElementById('room-badge').innerText = `部屋: ${currentRoomName}`;
         document.getElementById('server-save-btn').style.display = 'block';
+        // 過去にこの部屋のIDをブラウザが記憶していればそこから読み込む
+        cloudObjectId = localStorage.getItem(`cloud_id_${currentRoomName}`);
     }
 
     loadPresets().then(() => { 
@@ -161,39 +160,41 @@ function init() {
         }
         render(); 
     }); 
-    setupEvents(); 
-}
+    setupEvents(); }
 
-// クラウドサーバーから部屋データを読み込む
+// サーバーからデータを読み込む
 function loadFromCloud() {
     showStatus("読み込み中...", "#ff9500");
-    // 各ギルドごとの部屋名をキーにしてクラウドからデータを1発取得
-    fetch(`${API_URL}/id_or_endpoint_for_${currentRoomName}`, {
-        headers: { "X-Master-Key": MASTER_KEY }
+    
+    // 部屋名に紐づくデータIDがない場合は、新規部屋として扱う
+    if (!cloudObjectId) {
+        showStatus("新しい部屋です", "#007aff");
+        load();
+        return;
+    }
+
+    fetch(`${API_ENDPOINT}/${cloudObjectId}`)
+    .then(res => {
+        if(!res.ok) throw new Error("Not Found");
+        return res.json();
     })
-    .then(res => res.json())
     .then(json => {
-        // サーバーにデータがあれば展開、なければ空枠
-        const cloudData = json.record || json;
-        if(cloudData && cloudData.compressed) {
-            const d = JSON.parse(LZString.decompressFromEncodedURIComponent(cloudData.compressed));
+        if (json.data && json.data.compressed) {
+            const d = JSON.parse(LZString.decompressFromEncodedURIComponent(json.data.compressed));
             map = d.m || [];
             lines = d.l || [];
             render();
-            showStatus("最新データ読込完了", "#34c759");
-        } else {
-            showStatus("新しい部屋です", "#007aff");
-            load(); // 念のためローカルにあれば出す
+            showStatus("最新データ同期完了", "#34c759");
         }
     })
     .catch(err => {
-        console.error("オンラインデータなし、ローカルロードに切り替えます", err);
-        showStatus("オフラインモード", "#8e8e93");
+        console.log("新規部屋、または古いキャッシュです");
+        showStatus("データ未作成", "#8e8e93");
         load();
     });
 }
 
-// ボタンを押した時だけ、現在の部屋（URLのギルド）にデータを上書き保存する
+// サーバーへデータを保存する
 function saveToCloud() {
     if (!currentRoomName) return;
     deselect();
@@ -203,29 +204,34 @@ function saveToCloud() {
     const rawStr = JSON.stringify({m: map, l: lines});
     const compressedStr = LZString.compressToEncodedURIComponent(rawStr);
 
-    // サーバーへ現在のデータを送信して上書き
-    fetch(`${API_URL}/id_or_endpoint_for_${currentRoomName}`, {
-        method: 'PUT',
-        headers: {
-            "Content-Type": "application/json",
-            "X-Master-Key": MASTER_KEY
-        },
-        body: JSON.stringify({ room: currentRoomName, compressed: compressedStr })
+    const payload = {
+        name: `layout_room_${currentRoomName}`,
+        data: { compressed: compressedStr }
+    };
+
+    // すでにIDがあるならPUT(更新)、ないならPOST(新規作成)
+    const method = cloudObjectId ? 'PUT' : 'POST';
+    const url = cloudObjectId ? `${API_ENDPOINT}/${cloudObjectId}` : API_ENDPOINT;
+
+    fetch(url, {
+        method: method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
     })
-    .then(res => {
-        if(res.ok) {
-            showStatus("部屋へ保存完了！", "#34c759");
-            save(); // スマホの本体側にもバックアップ
-            alert(`【${currentRoomName}】の部屋に保存しました！\nこのURLを開いている全員に自動で共有されます。`);
-        } else {
-            throw new Error("サーバー拒否");
+    .then(res => res.json())
+    .then(json => {
+        if(json.id) {
+            cloudObjectId = json.id;
+            localStorage.setItem(`cloud_id_${currentRoomName}`, json.id); // 次回以降のためにIDを保存
+            showStatus("部屋に保存しました！", "#34c759");
+            save(); // スマホ本体にもバックアップ
+            alert(`【${currentRoomName}】の部屋データを保存しました！\n同じURLを開いている人全員に同期されます。`);
         }
     })
     .catch(err => {
         console.error(err);
-        showStatus("保存失敗", "#ff3b30");
-        // もしサーバーが用意されてない初期状態なら、従来通りのテキスト保存へ安全フォールバック
-        alert("オンライン保存には専用のデータ倉庫URL(API)の開設が必要です。\n代わりに現在の配置データを本体に一時保存しました。");
+        showStatus("保存エラー", "#ff3b30");
+        alert("通信エラーが発生しました。本体の保存領域に一時保存します。");
         save();
     });
 }
