@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>避難所レイアウト v29.3.5</title>
+    <title>避難所レイアウト v29.3.6</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
         :root { --panel-h: 250px; --panel-w: 220px; }
@@ -151,7 +151,35 @@ const T_W = 64, T_H = 32;
 let cam = { x: 0, y: 0, z: 1 }, assets = [], map = [], lines = [], selIdx = -1, activeAsset = -1, mode = 'move';
 let drag = false, pinch = false, lockedId = null, penStart = null, penCurrent = null, lastT = {x: 0, y: 0}, lastDist = 0, tempAssetStore = -1;
 
-function init() { window.addEventListener('resize', resize); resize(); cam.x = cvs.width/2; cam.y = cvs.height/3; loadPresets().then(() => { const params = new URLSearchParams(window.location.search); const urlData = params.get('d'); if (urlData) applyData(urlData); else load(); render(); }); setupEvents(); }
+function getDriveId(urlOrId) {
+    try {
+        const url = new URL(urlOrId);
+        const parts = url.pathname.split('/');
+        const idx = parts.indexOf('folders');
+        return idx !== -1 && parts[idx + 1] ? parts[idx + 1] : urlOrId;
+    } catch { return urlOrId; }
+}
+
+function init() { 
+    window.addEventListener('resize', resize); resize(); cam.x = cvs.width/2; cam.y = cvs.height/3; 
+    loadPresets().then(() => { 
+        const params = new URLSearchParams(window.location.search); 
+        const dParam = params.get('d'); 
+        const driveParam = params.get('room');
+        
+        if (dParam) {
+            applyData(dParam);
+        } else if (driveParam) {
+            const driveId = getDriveId(driveParam);
+            console.log("ドライブIDを抽出しました:", driveId);
+        } else {
+            load();
+        }
+        render(); 
+    }); 
+    setupEvents(); 
+}
+
 function zoom(scaleChange, centerX, centerY) { const newZ = Math.min(Math.max(cam.z * scaleChange, 0.1), 5); const ratio = newZ / cam.z; cam.x = centerX - (centerX - cam.x) * ratio; cam.y = centerY - (centerY - cam.y) * ratio; cam.z = newZ; }
 function drawTerritory(gx, gy, range, color) { ctx.fillStyle = color; ctx.beginPath(); const p1 = toS(gx - range, gy - range), p2 = toS(gx + range + 1, gy - range), p3 = toS(gx + range + 1, gy + range + 1), p4 = toS(gx - range, gy + range + 1); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.lineTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y); ctx.closePath(); ctx.fill(); ctx.strokeStyle = "rgba(0,122,255,0.3)"; ctx.lineWidth = 1/cam.z; ctx.stroke(); }
 
