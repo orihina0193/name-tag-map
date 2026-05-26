@@ -2,84 +2,99 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>同盟対戦マップ作成ツール</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Map Tool</title>
   
-  <!-- CDN Dependencies -->
+  <!-- CSS Reset & Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS Play CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- React 18 CDN -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/@babel/standalone@7.24.0/babel.min.js"></script>
+  
+  <!-- Babel compiler CDN (runs in browser) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- LZ-String compression CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
+  
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.min.js"></script>
 
   <style>
-    /* Prevent default touch scrolls and gestures on mobile devices */
-    html, body {
-      position: fixed;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      margin: 0;
-      padding: 0;
-      -webkit-user-select: none;
-      user-select: none;
+    /* Custom CSS animations matching Motion and custom behaviors */
+    @keyframes slideDownIn {
+      0% { opacity: 0; transform: translate(-50%, -20px); }
+      100% { opacity: 1; transform: translate(-50%, 0); }
     }
-    
-    /* Neumorphism and custom scrollbar styles */
-    ::-webkit-scrollbar {
-      width: 5px;
-      height: 5px;
-    }
-    ::-webkit-scrollbar-track {
-      background: #f1f1f1;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #c1c1c1;
-      border-radius: 10px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: #a1a1a1;
-    }
-
-    /* Keyframe Animations */
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes scaleUp {
-      from { transform: scale(0.95); opacity: 0; }
-      to { transform: scale(1); opacity: 1; }
-    }
-    @keyframes toastIn {
-      from { transform: translate(-50%, -20px); opacity: 0; }
-      to { transform: translate(-50%, 0); opacity: 1; }
-    }
-    @keyframes pulseSoft {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.6; }
-    }
-
-    .animate-fade-in {
-      animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
-    .animate-scale-up {
-      animation: scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    @keyframes slideUpIn {
+      0% { opacity: 0; transform: translate(-50%, 10px); }
+      100% { opacity: 1; transform: translate(-50%, 0); }
     }
     .animate-toast {
-      animation: toastIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      animation: slideDownIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
-    .animate-pulse-soft {
-      animation: pulseSoft 1.5s infinite ease-in-out;
+    .animate-guide {
+      animation: slideUpIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    body {
+      touch-action: none;
     }
   </style>
 </head>
-<body class="bg-[#e0e5ec] text-gray-800 font-sans antialiased overflow-hidden">
-
+<body>
   <div id="root"></div>
 
-  <!-- React JSX Application Script -->
+  <!-- React App using Babel JSX compilation -->
   <script type="text/babel">
     const { useState, useEffect, useRef } = React;
+    
+    // Destructure all required icons from global LucideReact
+    const { 
+      Camera, 
+      MapPin, 
+      Plus, 
+      Trash2, 
+      RotateCcw, 
+      Maximize2, 
+      SlidersHorizontal, 
+      Lock, 
+      Unlock, 
+      Users, 
+      Save, 
+      HelpCircle, 
+      Copy, 
+      Check, 
+      Eye, 
+      Grid, 
+      ChevronUp, 
+      ChevronDown, 
+      ChevronLeft, 
+      ChevronRight,
+      Move,
+      PenTool,
+      Eraser,
+      FileImage,
+      Upload,
+      X 
+    } = LucideReact;
 
     // API GAS Endpoint configuration
     const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzQOcpj6K247JSfRYxy40hHzCiTPt5MYEbvNKT6S33KZ3Ncp1XzzOXkePn4rAMuki0Y/exec";
@@ -99,59 +114,14 @@
       { name: "ROCK2", url: "https://raw.githubusercontent.com/orihina0193/map-tool/main/img/ROCK2.png", s: 0.75, o: -5, gw: 1, gh: 1, ox: 0, oy: 0 }
     ];
 
-    // Simple Custom SVG Icons Components
-    const Icons = {
-      Lock: () => (
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-      ),
-      Unlock: () => (
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>
-      ),
-      Users: () => (
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-      ),
-      Copy: () => (
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-      ),
-      X: () => (
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-      ),
-      Grid: () => (
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line></svg>
-      ),
-      ChevronUp: () => (
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
-      ),
-      ChevronDown: () => (
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-      ),
-      ChevronLeft: () => (
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-      ),
-      ChevronRight: () => (
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-      ),
-      Move: () => (
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="5 9 2 12 5 15"></polyline><polyline points="9 5 12 2 15 5"></polyline><polyline points="15 19 12 22 9 19"></polyline><polyline points="19 9 22 12 19 15"></polyline><line x1="2" y1="12" x2="22" y2="12"></line><line x1="12" y1="2" x2="12" y2="22"></line></svg>
-      ),
-      PenTool: () => (
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
-      ),
-      Eraser: () => (
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 20H7L3 16c-.5-.5-.5-1.4 0-1.9L13 4c.5-.5 1.4-.5 1.9 0L20 9.1c.5.5.5 1.4 0 1.9L15.1 16L20 20z"></path><path d="M18 12.5l-5.3 5.3"></path></svg>
-      ),
-      Upload: () => (
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-      )
-    };
-
     function App() {
       const [currentRoomName, setCurrentRoomName] = useState(null);
       const [guideMode, setGuideMode] = useState(false);
       const [guideText, setGuideText] = useState("ガイドモード：ボタンをタップして説明を表示");
       const [isEditLocked, setIsEditLocked] = useState(false);
       const [mode, setMode] = useState("move");
-
+      
+      // 新しい「座標登録モード」
       const [isCoordSettingMode, setIsCoordSettingMode] = useState(false);
       const [coordMapping, setCoordMapping] = useState({
         refGx: 0,
@@ -164,16 +134,19 @@
         y2: 101,
         isValid: false
       });
-
+      
+      // 座標基準点入力用のstate
       const [coordInput, setCoordInput] = useState({
         aX: "100", aY: "100",
         bX: "101", bY: "100",
         cX: "100", cY: "101"
       });
 
+      // タップ/クリックされた現在のマス座標（X:Y コピー用等）
       const [selectedGrid, setSelectedGrid] = useState(null);
       const [copiedNotification, setCopiedNotification] = useState(null);
 
+      // ステート群
       const [assets, setAssets] = useState([]);
       const [map, setMap] = useState([]);
       const [lines, setLines] = useState([]);
@@ -183,10 +156,12 @@
       const [syncStatus, setSyncStatus] = useState(null);
       const [clearClickCount, setClearClickCount] = useState(0);
 
+      // オーバーレイ / モーダル
       const [showMemOverlay, setShowMemOverlay] = useState(false);
       const [showAssetOverlay, setShowAssetOverlay] = useState(false);
       const [exportImageUrl, setExportImageUrl] = useState(null);
 
+      // キャンバス / カメラ Ref
       const canvasRef = useRef(null);
       const camRef = useRef({ x: 0, y: 0, z: 1 });
       const dragRef = useRef(false);
@@ -196,13 +171,17 @@
       const penCurrentRef = useRef(null);
       const lastTRef = useRef({ x: 0, y: 0 });
       const lastDistRef = useRef(0);
+
+      // 座標登録モードでのL字ドラッグ用
       const isDraggingCoordRef = useRef(false);
 
+      // コピー文字列
       const showToast = (msg) => {
         setCopiedNotification(msg);
         setTimeout(() => setCopiedNotification(null), 2500);
       };
 
+      // 画像のクロップ処理
       const cropImage = (img) => {
         const c = document.createElement("canvas");
         const t = c.getContext("2d");
@@ -235,19 +214,24 @@
         return c2.toDataURL();
       };
 
+      // 座標変換用の計算機 (等角グリッド gx, gy からゲーム内 X, Y を算出)
       const getGameCoords = (gx, gy) => {
         if (!coordMapping.isValid) return null;
         const gX = Math.round(gx);
         const gY = Math.round(gy);
+        
+        // Aからの相対的な位置
         const dx = gX - coordMapping.refGx;
         const dy = gY - coordMapping.refGy;
 
+        // 定義された3点から線形補間 (アフィンマッパー)
         const X = coordMapping.x0 + dx * (coordMapping.x1 - coordMapping.x0) + dy * (coordMapping.x2 - coordMapping.x0);
         const Y = coordMapping.y0 + dx * (coordMapping.y1 - coordMapping.y0) + dy * (coordMapping.y2 - coordMapping.y0);
 
         return { x: Math.round(X), y: Math.round(Y) };
       };
 
+      // ガイド表示切り替え
       const toggleGuideMode = () => {
         setGuideMode(!guideMode);
         if (!guideMode) {
@@ -279,6 +263,7 @@
         return true;
       };
 
+      // 編集ロック
       const toggleEditLock = () => {
         if (isEditLocked) {
           if (!confirm("閲覧モードを解除しますか？")) return;
@@ -291,7 +276,7 @@
         }
       };
 
-      // URL parameters and initial load
+      // URLパラメータとデータの初回ロード
       useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const room = params.get("room");
@@ -299,6 +284,7 @@
           setCurrentRoomName(room);
         }
 
+        // 座標マッピングデータの初期化ロード
         const savedMapping = localStorage.getItem("coord_mapping_v1");
         if (savedMapping) {
           try {
@@ -310,13 +296,14 @@
               cX: parsed.x2.toString(), cY: parsed.y2.toString()
             });
           } catch (e) {
-            console.error("Failed to load map coordinates:", e);
+            console.error("Failed to load layout map coordinates:", e);
           }
         }
 
         loadPresetsAssets();
       }, []);
 
+      // クラウドまたはローカルからの読込
       useEffect(() => {
         if (currentRoomName) {
           loadFromCloud(currentRoomName);
@@ -334,8 +321,11 @@
         }
       };
 
+      // プリセットロード
       const loadPresetsAssets = async () => {
         const loadedAssets = [];
+        const hasBackend = window.location.hostname.endsWith("run.app") || window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+
         for (const p of PRESETS) {
           await new Promise((resolve) => {
             const img = new Image();
@@ -361,7 +351,6 @@
             };
 
             img.onerror = () => {
-              // Direct GitHub RAW fallback
               const directImg = new Image();
               directImg.crossOrigin = "anonymous";
               directImg.onload = () => {
@@ -383,17 +372,48 @@
                 };
                 i2.src = src;
               };
-              directImg.onerror = () => resolve();
+
+              directImg.onerror = () => {
+                const localImg = new Image();
+                localImg.onload = () => {
+                  const src = cropImage(localImg);
+                  const i2 = new Image();
+                  i2.onload = () => {
+                    loadedAssets.push({
+                      img: i2,
+                      src,
+                      name: p.name,
+                      defS: p.s,
+                      defO: p.o,
+                      gw: p.gw,
+                      gh: p.gh,
+                      ox: p.ox,
+                      oy: p.oy
+                    });
+                    resolve();
+                  };
+                  i2.src = src;
+                };
+                localImg.onerror = () => resolve();
+                const relativePath = p.url.includes("img/") ? p.url.slice(p.url.indexOf("img/")) : p.url;
+                localImg.src = relativePath;
+              };
               directImg.src = p.url;
             };
 
-            // Raw direct fetch without backend proxy on client side (GitHub Pages)
-            img.src = p.url;
+            if (hasBackend) {
+              img.src = '/api/proxy-image?url=' + encodeURIComponent(p.url);
+            } else {
+              const relativePath = p.url.includes("img/") ? p.url.slice(p.url.indexOf("img/")) : null;
+              img.src = relativePath || p.url;
+            }
           });
         }
+
         setAssets(loadedAssets);
       };
 
+      // クラウド読込
       const loadFromCloud = (roomName) => {
         showStatus("サーバーから読込中...", "#ff9500", 0);
         fetch(`${API_ENDPOINT}?room=${encodeURIComponent(roomName)}`)
@@ -416,6 +436,7 @@
           });
       };
 
+      // クラウド保存
       const saveToCloud = () => {
         let room = currentRoomName;
         if (!room) {
@@ -452,11 +473,13 @@
           });
       };
 
+      // ローカル保存
       const saveLocalData = (roomName) => {
         const key = roomName ? `map_${roomName}` : "map_v293";
         localStorage.setItem(key, JSON.stringify({ m: map, l: lines }));
       };
 
+      // ローカル読込
       const loadLocalData = () => {
         const key = currentRoomName ? `map_${currentRoomName}` : "map_v293";
         const s = localStorage.getItem(key);
@@ -471,6 +494,7 @@
         }
       };
 
+      // オリジナル画像追加
       const handleFiles = (files) => {
         if (isEditLocked || !files) return;
         for (let i = 0; i < files.length; i++) {
@@ -483,28 +507,31 @@
               const src = cropImage(img);
               const i2 = new Image();
               i2.onload = () => {
-                setAssets(prev => [
-                  ...prev,
-                  {
-                    img: i2,
-                    src,
-                    name: null,
-                    defS: 1,
-                    defO: 0,
-                    gw: 1,
-                    gh: 1,
-                    ox: 0,
-                    oy: 0
-                  }
-                ]);
-                setTimeout(() => {
-                  setActiveAsset(assets.length);
-                  setTempAssetStore(assets.length);
-                  setSelIdx(-1);
-                  lockedIdRef.current = null;
-                  setMode("move");
-                  setShowAssetOverlay(false);
-                }, 150);
+                setAssets(prev => {
+                  const next = [
+                    ...prev,
+                    {
+                      img: i2,
+                      src,
+                      name: null,
+                      defS: 1,
+                      defO: 0,
+                      gw: 1,
+                      gh: 1,
+                      ox: 0,
+                      oy: 0
+                    }
+                  ];
+                  setTimeout(() => {
+                    setActiveAsset(next.length - 1);
+                    setTempAssetStore(next.length - 1);
+                    setSelIdx(-1);
+                    lockedIdRef.current = null;
+                    setMode("move");
+                    setShowAssetOverlay(false);
+                  }, 150);
+                  return next;
+                });
               };
               i2.src = src;
             };
@@ -545,6 +572,7 @@
         showToast("基準座標を登録し、等角マップ全体の自動計算を有効化しました！");
       };
 
+      // 選択解除
       const deselect = () => {
         setActiveAsset(-1);
         setTempAssetStore(-1);
@@ -553,6 +581,7 @@
         setSelectedGrid(null);
       };
 
+      // 特定の建物へのカメラジャンプ
       const jumpToMember = (id) => {
         const d = map.find((item) => item.id === id);
         if (!d || !canvasRef.current) return;
@@ -564,13 +593,14 @@
         const pos = toS(refX, refY);
         camRef.current.x = canvasRef.current.width / 2 - pos.x * camRef.current.z;
         camRef.current.y = canvasRef.current.height / 2 - pos.y * camRef.current.z;
-
+        
         const idx = map.findIndex((item) => item.id === id);
         setSelIdx(idx);
         setSelectedGrid({ gx: refX, gy: refY });
         setShowMemOverlay(false);
       };
 
+      // メンバー名更新
       const updateMemberName = (val) => {
         if (isEditLocked) return;
         if (selIdx !== -1) {
@@ -583,6 +613,7 @@
         }
       };
 
+      // サイズ、接地、微調整の反映
       const updateItemScale = (scale) => {
         if (isEditLocked || selIdx === -1) return;
         setMap((prev) => {
@@ -631,6 +662,7 @@
         saveLocalData();
       };
 
+      // 全クリア
       const handleClearAll = () => {
         if (isEditLocked) return;
         if (clearClickCount === 0) {
@@ -647,6 +679,7 @@
         }
       };
 
+      // 座標コピー
       const handleCopyGridCoords = (gx, gy) => {
         const coords = getGameCoords(gx, gy);
         if (!coords) {
@@ -670,6 +703,7 @@
           });
       };
 
+      // クォータービュー座標・画面座標変換公式
       const toS = (gx, gy) => ({
         x: (gx - gy) * (T_W / 2),
         y: (gx + gy) * (T_H / 2)
@@ -685,6 +719,7 @@
         };
       };
 
+      // 重複判定
       const isBlocked = (gx, gy, gw, gh, ignoreId = null) => {
         for (let x = gx; x < gx + gw; x++) {
           for (let y = gy; y < gy + gh; y++) {
@@ -696,13 +731,14 @@
         return false;
       };
 
+      // Canvasリサイズ
       useEffect(() => {
         const handleResize = () => {
           const cvs = canvasRef.current;
           if (!cvs) return;
           const nw = cvs.parentElement?.clientWidth || window.innerWidth;
           const nh = cvs.parentElement?.clientHeight || window.innerHeight;
-
+          
           if (cvs.width > 0) {
             camRef.current.x += (nw - cvs.width) / 2;
             camRef.current.y += (nh - cvs.height) / 2;
@@ -718,8 +754,9 @@
         window.addEventListener("resize", handleResize);
         handleResize();
         return () => window.removeEventListener("resize", handleResize);
-      }, [assets, map, lines, selIdx, activeAsset, selectedGrid, coordMapping, isCoordSettingMode]);
+      }, [assets]);
 
+      // 描画エンジン
       const drawMap = () => {
         const cvs = canvasRef.current;
         if (!cvs) return;
@@ -731,7 +768,7 @@
         ctx.translate(camRef.current.x, camRef.current.y);
         ctx.scale(camRef.current.z, camRef.current.z);
 
-        // 1. Grid
+        // 1. グリッドの描画
         ctx.strokeStyle = "rgba(0,0,0,0.08)";
         ctx.lineWidth = 1 / camRef.current.z;
         for (let i = -20; i <= 40; i++) {
@@ -750,7 +787,7 @@
           ctx.stroke();
         }
 
-        // 2. Special Lands
+        // 2. 特殊領地の描画
         map.forEach((d) => {
           const a = assets[d.aIdx];
           if (!a) return;
@@ -761,7 +798,7 @@
           }
         });
 
-        // 3. Lines
+        // 3. ルート線 (赤) の描画
         lines.forEach((l) => {
           ctx.beginPath();
           ctx.strokeStyle = "rgba(255,0,0,0.6)";
@@ -773,7 +810,7 @@
           ctx.stroke();
         });
 
-        // 4. Sort and Draw Buildings
+        // 4. 配置済み建物のソート・描画
         const sorted = [...map].sort(
           (a, b) => (Math.round(a.x) + Math.round(a.y)) - (Math.round(b.x) + Math.round(b.y))
         );
@@ -810,7 +847,7 @@
           }
         });
 
-        // 5. Member names badging
+        // 5. ギルメン名のバッジテキスト描画
         sorted.forEach((d) => {
           if (!d.mem) return;
           const a = assets[d.aIdx];
@@ -837,7 +874,7 @@
           ctx.restore();
         });
 
-        // 6. Draw Line Preview
+        // 6. ペンモード時のルート線プレビュー
         if (mode === "pen" && penStartRef.current && penCurrentRef.current) {
           ctx.beginPath();
           ctx.setLineDash([6 / camRef.current.z, 3 / camRef.current.z]);
@@ -851,7 +888,7 @@
           ctx.setLineDash([]);
         }
 
-        // 7. Clicked grid highlight
+        // 7. タップ選択された任意グリッドのハイライト
         if (selectedGrid) {
           const { gx, gy } = selectedGrid;
           ctx.strokeStyle = "#ff3b30";
@@ -876,7 +913,7 @@
           ctx.fill();
         }
 
-        // 8. L-Shape Anchors
+        // 8. 座標設定用の基準点の描画
         if (isCoordSettingMode) {
           const rx = coordMapping.refGx;
           const ry = coordMapping.refGy;
@@ -885,7 +922,7 @@
           ctx.save();
           ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
           ctx.fillRect(0, 0, cvs.width, cvs.height);
-
+          
           ctx.translate(camRef.current.x, camRef.current.y);
           ctx.scale(camRef.current.z, camRef.current.z);
 
@@ -997,7 +1034,7 @@
             isDraggingCoordRef.current = true;
             return;
           }
-
+          
           setCoordMapping(prev => ({ ...prev, refGx: gx_o, refGy: gy_o }));
           isDraggingCoordRef.current = true;
           return;
@@ -1218,7 +1255,6 @@
       return (
         <div className="fixed inset-0 select-none flex flex-col bg-[#e0e5ec] text-gray-800 font-sans touch-none overflow-hidden">
           
-          {/* Main Drawing Area */}
           <div className="flex-1 relative overflow-hidden" id="main-container">
             <canvas 
               ref={canvasRef} 
@@ -1228,75 +1264,87 @@
                 handleStart(e.clientX, e.clientY);
               }}
               onMouseMove={(e) => {
-                if (dragRef.current || lockedIdRef.current !== null || isDraggingCoordRef.current || (mode === "pen" && penStartRef.current)) {
-                  handleMove(e.clientX, e.clientY, e.clientX - lastTRef.current.x, e.clientY - lastTRef.current.y);
+                if (e.buttons === 1) {
+                  const dx = e.clientX - lastTRef.current.x;
+                  const dy = e.clientY - lastTRef.current.y;
                   lastTRef.current = { x: e.clientX, y: e.clientY };
+                  handleMove(e.clientX, e.clientY, dx, dy);
                 }
               }}
               onMouseUp={handleEnd}
               onMouseLeave={handleEnd}
-              onWheel={(e) => {
-                e.preventDefault();
-                zoom(e.deltaY > 0 ? 0.9 : 1.1, e.clientX, e.clientY);
-              }}
+              
               onTouchStart={(e) => {
-                if (e.touches.length >= 2) {
+                if (e.touches.length === 1) {
+                  const t = e.touches[0];
+                  lastTRef.current = { x: t.clientX, y: t.clientY };
+                  handleStart(t.clientX, t.clientY);
+                } else if (e.touches.length === 2) {
                   pinchRef.current = true;
-                  lastDistRef.current = Math.hypot(
-                    e.touches[0].clientX - e.touches[1].clientX,
-                    e.touches[0].clientY - e.touches[1].clientY
-                  );
-                  return;
+                  const dx = e.touches[0].clientX - e.touches[1].clientX;
+                  const dy = e.touches[0].clientY - e.touches[1].clientY;
+                  lastDistRef.current = Math.hypot(dx, dy);
                 }
-                const t = e.touches[0];
-                lastTRef.current = { x: t.clientX, y: t.clientY };
-                handleStart(t.clientX, t.clientY);
               }}
               onTouchMove={(e) => {
-                if (pinchRef.current && e.touches.length >= 2) {
-                  const d = Math.hypot(
-                    e.touches[0].clientX - e.touches[1].clientX,
-                    e.touches[0].clientY - e.touches[1].clientY
-                  );
-                  zoom(
-                    d / lastDistRef.current,
-                    (e.touches[0].clientX + e.touches[1].clientX) / 2,
-                    (e.touches[0].clientY + e.touches[1].clientY) / 2
-                  );
-                  lastDistRef.current = d;
-                } else if (!pinchRef.current) {
+                if (e.touches.length === 1 && !pinchRef.current) {
                   const t = e.touches[0];
-                  handleMove(t.clientX, t.clientY, t.clientX - lastTRef.current.x, t.clientY - lastTRef.current.y);
+                  const dx = t.clientX - lastTRef.current.x;
+                  const dy = t.clientY - lastTRef.current.y;
                   lastTRef.current = { x: t.clientX, y: t.clientY };
+                  handleMove(t.clientX, t.clientY, dx, dy);
+                } else if (e.touches.length === 2 && pinchRef.current) {
+                  const rect = canvasRef.current.getBoundingClientRect();
+                  const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+                  const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+                  
+                  const dx = e.touches[0].clientX - e.touches[1].clientX;
+                  const dy = e.touches[0].clientY - e.touches[1].clientY;
+                  const d = Math.hypot(dx, dy);
+                  if (lastDistRef.current > 0) {
+                    zoom(d / lastDistRef.current, cx, cy);
+                  }
+                  lastDistRef.current = d;
                 }
               }}
-              onTouchEnd={handleEnd}
+              onTouchEnd={(e) => {
+                if (e.touches.length === 0) {
+                  handleEnd();
+                }
+              }}
+              onWheel={(e) => {
+                const rect = canvasRef.current.getBoundingClientRect();
+                const scale = e.deltaY < 0 ? 1.08 : 0.92;
+                zoom(scale, e.clientX - rect.left, e.clientY - rect.top);
+              }}
             />
 
-            {/* Top Room Badge */}
-            <div id="room-badge" className="absolute top-[75px] left-[15px] bg-black/85 text-white py-1.5 px-3 rounded-full text-xs font-bold z-[500] pointer-events-none shadow-md font-mono">
+            {/* 画面左上のバッジ情報 */}
+            <div id="room-badge" className="absolute top-[75px] left-[15px] bg-black/85 text-white py-1.5 px-3 rounded-full text-xs font-bold z-[500] pointer-events-none shadow-md">
               部屋: {currentRoomName ? currentRoomName : "未指定 (ローカル)"}
             </div>
 
-            {/* Notification Toast */}
+            {/* コピー完了・各種トースト表示 */}
             {copiedNotification && (
-              <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-slate-900 text-white py-2 px-5 rounded-lg text-sm font-semibold shadow-lg z-[2500] text-center border border-slate-700 animate-toast">
+              <div 
+                className="absolute top-24 left-1/2 bg-slate-900 text-white py-2 px-5 rounded-lg text-sm font-semibold shadow-lg z-[2500] text-center border border-slate-700 -translate-x-1/2 animate-toast"
+              >
                 {copiedNotification}
               </div>
             )}
 
-            {/* Sync Badge */}
+            {/* 同期ステータス */}
             {syncStatus && (
               <div 
                 id="sync-status" 
                 style={{ backgroundColor: syncStatus.color }}
-                className="absolute top-[75px] right-[65px] text-white py-1.5 px-3 rounded-full text-xs font-bold z-[500] shadow-md transition-all duration-300 font-mono"
+                className="absolute top-[75px] right-[65px] text-white py-1.5 px-3 rounded-full text-xs font-bold z-[500] shadow-md transition-all duration-300"
               >
                 {syncStatus.text}
               </div>
             )}
 
-            {/* Guide Button */}
+            {/* 右上のヘルプ・ガイドトリガー */}
             <button 
               id="guide-trigger" 
               onClick={toggleGuideMode}
@@ -1305,259 +1353,230 @@
               {guideMode ? "×" : "?"}
             </button>
 
-            {/* Guide Info Overlay */}
+            {/* ガイドメッセージ表示ボックス */}
             {guideMode && (
               <div 
                 id="guide-msg-box" 
-                className="absolute top-[125px] left-1/2 -translate-x-1/2 w-[85%] max-w-[400px] bg-black/90 text-white p-3.5 rounded-xl text-xs leading-relaxed z-[2500] text-center border border-white/20 shadow-xl animate-fade-in"
+                className="absolute top-[125px] left-1/2 w-[85%] max-w-[400px] bg-black/90 text-white p-3.5 rounded-xl text-xs leading-relaxed z-[2500] text-center border border-white/20 shadow-xl -translate-x-1/2 animate-guide"
               >
                 <div className="font-bold text-[#34c759] mb-1">💡 ガイドモード</div>
                 {guideText}
               </div>
             )}
 
-            {/* Top control dashboard */}
+            {/* トップコントロールパネル */}
             <div id="top-panel" className="absolute top-0 w-full h-[65px] bg-white/95 border-b border-gray-300 flex items-center px-3.5 box-border z-[100] gap-2 shadow-sm">
               <div 
                 id="cur-box" 
                 onClick={(e) => handleGuideClick('選択解除', e) || deselect()}
-                className={`w-12 h-12 border-2 border-[#007aff] rounded-lg bg-white bg-contain bg-no-repeat bg-center flex-shrink-0 cursor-pointer relative shadow-inner ${(selIdx !== -1 || activeAsset !== -1) ? "after:content-['解除'] after:absolute after:bottom-[-2px] after:right-[-2px] after:bg-[#007aff] after:text-white after:text-[8px] after:px-1 after:rounded-md" : ""}`}
+                className={`w-12 h-12 border-2 border-[#007aff] rounded-lg bg-white bg-contain bg-no-repeat bg-center flex-shrink-0 cursor-pointer relative shadow-inner ${selIdx !== -1 || activeAsset !== -1 ? "after:content-['解除'] after:absolute after:bottom-[-2px] after:right-[-2px] after:bg-[#007aff] after:text-white after:text-[8px] after:px-1 after:rounded-md" : ""}`}
                 style={{ 
-                  backgroundImage: (selIdx !== -1 && map[selIdx]?.aIdx !== undefined && assets[map[selIdx].aIdx]) 
+                  backgroundImage: selIdx !== -1 && map[selIdx]?.aIdx !== undefined && assets[map[selIdx].aIdx]
                     ? `url(${assets[map[selIdx].aIdx].src})` 
-                    : (activeAsset !== -1 && assets[activeAsset]) 
+                    : activeAsset !== -1 && assets[activeAsset] 
                     ? `url(${assets[activeAsset].src})` 
                     : "none" 
                 }}
                 title="選択解除"
               />
 
-              <input 
-                type="text" 
-                id="member-name-in" 
-                placeholder={selIdx !== -1 ? "ギルメン名を入力" : "建物タップで名前変更"}
-                disabled={isEditLocked || selIdx === -1}
-                value={selIdx !== -1 && map[selIdx] ? map[selIdx].mem : ""}
-                onChange={(e) => updateMemberName(e.target.value)}
-                onClick={(e) => {
-                  if (guideMode) {
-                    handleGuideClick('ギルメン名', e);
-                    e.target.blur();
-                  }
-                }}
-                className="flex-1 h-11 border border-gray-300 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#007aff] bg-white disabled:bg-gray-100 disabled:text-gray-500 font-medium transition-all"
-              />
+              <div id="prop-edit-area" className="flex-1 flex flex-col justify-center min-w-0 pr-1">
+                <input 
+                  type="text"
+                  placeholder={selIdx === -1 ? "配置後に名前を登録可能" : "例: orange-01"}
+                  value={selIdx !== -1 ? map[selIdx].mem : ""}
+                  onChange={(e) => updateMemberName(e.target.value)}
+                  disabled={selIdx === -1 || isEditLocked}
+                  onClick={(e) => handleGuideClick('ギルメン名', e)}
+                  className="w-full text-xs font-bold border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:border-[#007aff] placeholder-gray-400 bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
+                />
+              </div>
 
-              <button 
-                className="top-btn w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 flex items-center justify-center flex-shrink-0 cursor-pointer shadow-sm text-lg"
-                onClick={(e) => handleGuideClick('名簿', e) || setShowMemOverlay(true)}
-                title="名簿"
-              >
-                👥
-              </button>
-              <button 
-                className="top-btn w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 flex items-center justify-center flex-shrink-0 cursor-pointer shadow-sm text-lg"
-                onClick={(e) => handleGuideClick('素材追加', e) || setShowAssetOverlay(true)}
-                title="素材追加"
-              >
-                ＋
-              </button>
-              <button 
-                className={`top-clr-btn h-11 px-3 rounded-lg text-white font-bold text-xs flex items-center justify-center flex-shrink-0 cursor-pointer border-none shadow-sm transition-colors ${clearClickCount === 1 ? "bg-amber-500 animate-pulse" : "bg-red-500 hover:bg-red-600"}`}
-                onClick={(e) => handleGuideClick('全消去', e) || handleClearAll()}
-                title="全消去"
-              >
-                {clearClickCount === 1 ? "本当に全消去？" : "全消去"}
-              </button>
+              <div id="head-acts" className="flex items-center gap-1.5">
+                <button 
+                  onClick={(e) => handleGuideClick('名簿', e) || setShowMemOverlay(true)}
+                  className="h-8 px-2.5 bg-white border border-gray-300 rounded-md flex items-center gap-1 text-xs font-bold text-gray-700 hover:bg-gray-50 cursor-pointer shadow-sm"
+                  title="配置メンバー一覧"
+                >
+                  <Users size={13} /> <span className="hidden sm:inline">名簿</span>
+                </button>
+                <button 
+                  onClick={(e) => handleGuideClick('素材追加', e) || setShowAssetOverlay(true)}
+                  className="h-8 px-2.5 bg-[#007aff] text-white rounded-md flex items-center gap-1 text-xs font-bold cursor-pointer hover:bg-[#007aff]/90 shadow-sm"
+                  title="アセット選択・追加"
+                >
+                  <Plus size={13} /> 素材追加
+                </button>
+                <div className="w-[1px] h-6 bg-gray-300" />
+                <button 
+                  onClick={(e) => handleGuideClick('リセット', e) || saveToCloud()}
+                  className="h-8 px-2.5 bg-[#34c759] hover:bg-[#34c759]/90 text-white rounded-md flex items-center justify-center font-bold text-xs cursor-pointer shadow-sm gap-1"
+                  title="クラウドに保存"
+                >
+                  <Save size={13} /> 保存
+                </button>
+              </div>
             </div>
 
-            {/* Selected Grid info and Copy coordinates popover */}
-            {selectedGrid && (
-              <div className="absolute bottom-[235px] left-1/2 -translate-x-1/2 z-[1000] w-[90%] max-w-[360px] bg-slate-900/95 backdrop-blur-md rounded-xl p-3 border border-slate-700 shadow-2xl text-white flex flex-col gap-2 animate-scale-up">
-                <div className="flex justify-between items-center border-b border-slate-800 pb-1.5">
-                  <span className="text-xs font-semibold text-slate-400 flex items-center gap-1 font-mono">
-                    <Icons.Grid /> Grid: (x:{Math.round(selectedGrid.gx)}, y:{Math.round(selectedGrid.gy)})
-                  </span>
-                  <button onClick={() => setSelectedGrid(null)} className="text-slate-400 hover:text-white">
-                    <Icons.X />
-                  </button>
-                </div>
-                
-                <div className="flex items-center justify-between gap-2.5">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] text-slate-400">ゲーム内座標 (X:Y)</span>
-                    {coordMapping.isValid ? (
-                      <span className="text-base font-bold text-amber-400 font-mono">
-                        X: {getGameCoords(selectedGrid.gx, selectedGrid.gy)?.x} , Y: {getGameCoords(selectedGrid.gx, selectedGrid.gy)?.y}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-rose-400 font-semibold text-left">基準座標未登録</span>
-                    )}
+            {/* ボトムコントロールパネル */}
+            <div id="bottom-panel" className="absolute bottom-0 w-full bg-white/95 border-t border-gray-300 z-[100] px-3.5 py-3.5 font-sans box-border shadow-2xl flex flex-col gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div 
+                  className="flex flex-col gap-1.5 min-w-0"
+                  onClick={(e) => handleGuideClick('サイズ調整', e)}
+                >
+                  <div className="flex justify-between items-center pr-1">
+                    <span className="text-[10px] font-extrabold text-[#007aff] tracking-wider">📐 建物サイズ調整</span>
+                    <span className="text-[10px] font-mono font-bold bg-sky-50 text-[#007aff] px-1.5 rounded">
+                      x{selIdx !== -1 ? map[selIdx].s.toFixed(2) : "1.00"}
+                    </span>
                   </div>
+                  <div className="flex items-center gap-1.5">
+                    <button 
+                      onClick={() => adjScale(-0.05)}
+                      disabled={selIdx === -1 || isEditLocked}
+                      className="w-7 h-7 bg-white text-gray-700 border border-gray-300 rounded flex items-center justify-center font-bold font-semibold disabled:opacity-40 select-none cursor-pointer hover:bg-gray-50 active:scale-95 transition-transform text-xs"
+                    >
+                      －
+                    </button>
+                    <input 
+                      type="range"
+                      min="0.1"
+                      max="3.0"
+                      step="0.05"
+                      value={selIdx !== -1 ? map[selIdx].s : 1.0}
+                      onChange={(e) => updateItemScale(parseFloat(e.target.value))}
+                      disabled={selIdx === -1 || isEditLocked}
+                      className="flex-1 accent-[#007aff] h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer disabled:opacity-30"
+                    />
+                    <button 
+                      onClick={() => adjScale(0.05)}
+                      disabled={selIdx === -1 || isEditLocked}
+                      className="w-7 h-7 bg-white text-gray-700 border border-gray-300 rounded flex items-center justify-center font-bold font-semibold disabled:opacity-40 select-none cursor-pointer hover:bg-gray-50 active:scale-95 transition-transform text-xs"
+                    >
+                      ＋
+                    </button>
+                  </div>
+                </div>
 
-                  {coordMapping.isValid ? (
+                <div 
+                  className="flex flex-col gap-1.5 min-w-0"
+                  onClick={(e) => handleGuideClick('接地調整', e)}
+                >
+                  <div className="flex justify-between items-center pr-1">
+                    <span className="text-[10px] font-extrabold text-[#007aff] tracking-wider">🗻 前後関係接地調整</span>
+                    <span className="text-[10px] font-mono font-bold bg-sky-50 text-[#007aff] px-1.5 rounded">
+                      {selIdx !== -1 ? map[selIdx].off : "0"}px
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
                     <button 
-                      onClick={() => handleCopyGridCoords(selectedGrid.gx, selectedGrid.gy)}
-                      className="bg-sky-600 hover:bg-sky-500 transition-colors py-1.5 px-3 rounded-lg text-xs font-bold flex items-center gap-1 shrink-0"
+                      onClick={() => adjOffset(-1)}
+                      disabled={selIdx === -1 || isEditLocked}
+                      className="w-7 h-7 bg-white text-gray-700 border border-gray-300 rounded flex items-center justify-center font-bold font-semibold disabled:opacity-40 select-none cursor-pointer hover:bg-gray-50 active:scale-95 transition-transform text-xs"
                     >
-                      <Icons.Copy /> コピー
+                      －
                     </button>
-                  ) : (
+                    <input 
+                      type="range"
+                      min="-40"
+                      max="40"
+                      step="1"
+                      value={selIdx !== -1 ? map[selIdx].off : 0}
+                      onChange={(e) => updateItemOffset(parseInt(e.target.value))}
+                      disabled={selIdx === -1 || isEditLocked}
+                      className="flex-1 accent-[#007aff] h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer disabled:opacity-30"
+                    />
                     <button 
-                      onClick={() => toggleCoordSettingMode()}
-                      className="bg-amber-600 hover:bg-amber-500 transition-colors py-1.5 px-3 rounded-lg text-xs font-bold shrink-0 animate-pulse"
+                      onClick={() => adjOffset(1)}
+                      disabled={selIdx === -1 || isEditLocked}
+                      className="w-7 h-7 bg-white text-gray-700 border border-gray-300 rounded flex items-center justify-center font-bold font-semibold disabled:opacity-40 select-none cursor-pointer hover:bg-gray-50 active:scale-95 transition-transform text-xs"
                     >
-                      座標登録モードへ
+                      ＋
                     </button>
-                  )}
+                  </div>
+                </div>
+
+                <div 
+                  className="flex justify-between gap-1 pr-1"
+                  onClick={(e) => handleGuideClick('微調整', e)}
+                >
+                  <div className="flex flex-col justify-center flex-1">
+                    <span className="text-[10px] font-extrabold text-[#007aff] tracking-wider mb-0.5">🎮 位置アンカー微調整</span>
+                    <span className="text-[9px] text-gray-400 font-medium font-semibold">10%ピクセル単位でドラッグ時のズレを修正</span>
+                  </div>
+                  <div className="relative w-20 h-20 shrink-0 bg-gray-100 rounded-lg border border-gray-300/60 p-1 flex items-center justify-center scale-95 origin-right">
+                    <button 
+                      disabled={selIdx === -1 || isEditLocked}
+                      onClick={() => adjNudge(0, -0.1)}
+                      className="absolute top-0.5 left-1/2 -translate-x-1/2 w-6 h-6 bg-white border border-gray-300/70 hover:bg-gray-50 active:scale-95 transition-all text-gray-600 rounded flex items-center justify-center font-bold disabled:opacity-40 shadow-sm cursor-pointer"
+                    >
+                      <ChevronUp size={14} />
+                    </button>
+                    <button 
+                      disabled={selIdx === -1 || isEditLocked}
+                      onClick={() => adjNudge(-0.1, 0)}
+                      className="absolute left-0.5 top-1/2 -translate-y-1/2 w-6 h-6 bg-white border border-gray-300/70 hover:bg-gray-50 active:scale-95 transition-all text-gray-600 rounded flex items-center justify-center font-bold disabled:opacity-40 shadow-sm cursor-pointer"
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                    <button 
+                      disabled={selIdx === -1 || isEditLocked}
+                      className="w-4 h-4 rounded-full bg-sky-200 border border-sky-400/40 opacity-70"
+                    />
+                    <button 
+                      disabled={selIdx === -1 || isEditLocked}
+                      onClick={() => adjNudge(0.1, 0)}
+                      className="absolute right-0.5 top-1/2 -translate-y-1/2 w-6 h-6 bg-white border border-gray-300/70 hover:bg-gray-50 active:scale-95 transition-all text-gray-600 rounded flex items-center justify-center font-bold disabled:opacity-40 shadow-sm cursor-pointer"
+                    >
+                      <ChevronRight size={14} />
+                    </button>
+                    <button 
+                      disabled={selIdx === -1 || isEditLocked}
+                      onClick={() => adjNudge(0, 0.1)}
+                      className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-6 h-6 bg-white border border-gray-300/70 hover:bg-gray-50 active:scale-95 transition-all text-gray-600 rounded flex items-center justify-center font-bold disabled:opacity-40 shadow-sm cursor-pointer"
+                    >
+                      <ChevronDown size={14} />
+                    </button>
+                  </div>
                 </div>
               </div>
-            )}
-          </div>
 
-          {/* Bottom Panel controls */}
-          <div id="bot-panel" className="bg-white/98 border-t border-gray-300 px-3 py-2 box-border z-[100] flex flex-col gap-1.5 h-[228px] shrink-0 shadow-lg">
-            
-            {/* Scale Slidebar */}
-            <div 
-              className="flex items-center gap-2"
-              onClick={(e) => handleGuideClick('サイズ調整', e)}
-            >
-              <label className="text-[11px] font-bold w-9 shrink-0 text-gray-500">サイズ</label>
-              <button 
-                disabled={isEditLocked || selIdx === -1}
-                onClick={() => adjScale(-0.05)}
-                className="w-9 h-8 text-lg border border-gray-300 bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 rounded-md text-[#007aff] cursor-pointer shrink-0 font-bold active:bg-gray-200 transition-colors"
-              >
-                -
-              </button>
-              <input 
-                type="range" 
-                id="size-s" 
-                min="0.1" 
-                max="5" 
-                step="0.05"
-                disabled={isEditLocked || selIdx === -1}
-                value={selIdx !== -1 && map[selIdx] ? map[selIdx].s : 1}
-                onChange={(e) => updateItemScale(parseFloat(e.target.value))}
-                className="flex-1 h-9 cursor-pointer accent-[#007aff]"
-              />
-              <button 
-                disabled={isEditLocked || selIdx === -1}
-                onClick={() => adjScale(0.05)}
-                className="w-9 h-8 text-lg border border-gray-300 bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 rounded-md text-[#007aff] cursor-pointer shrink-0 font-bold active:bg-gray-200 transition-colors"
-              >
-                +
-              </button>
-            </div>
-
-            {/* Depth Slidebar */}
-            <div 
-              className="flex items-center gap-2"
-              onClick={(e) => handleGuideClick('接地調整', e)}
-            >
-              <label className="text-[11px] font-bold w-9 shrink-0 text-gray-500">接地</label>
-              <button 
-                disabled={isEditLocked || selIdx === -1}
-                onClick={() => adjOffset(-1)}
-                className="w-9 h-8 text-lg border border-gray-300 bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 rounded-md text-[#007aff] cursor-pointer shrink-0 font-bold active:bg-gray-200 transition-colors"
-              >
-                -
-              </button>
-              <input 
-                type="range" 
-                id="off-s" 
-                min="-100" 
-                max="100" 
-                step="1"
-                disabled={isEditLocked || selIdx === -1}
-                value={selIdx !== -1 && map[selIdx] ? map[selIdx].off : 0}
-                onChange={(e) => updateItemOffset(parseInt(e.target.value))}
-                className="flex-1 h-9 cursor-pointer accent-[#007aff]"
-              />
-              <button 
-                disabled={isEditLocked || selIdx === -1}
-                onClick={() => adjOffset(1)}
-                className="w-9 h-8 text-lg border border-gray-300 bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 rounded-md text-[#007aff] cursor-pointer shrink-0 font-bold active:bg-gray-200 transition-colors"
-              >
-                +
-              </button>
-            </div>
-
-            {/* Nudge Buttons and Tools Dashboard */}
-            <div className="flex gap-2.5 w-full mt-1">
-              <div 
-                id="nudge-grid" 
-                className="grid grid-cols-3 gap-1 w-[120px] shrink-0"
-                onClick={(e) => handleGuideClick('微調整', e)}
-              >
-                <div />
-                <button 
-                  disabled={isEditLocked || selIdx === -1}
-                  onClick={() => adjNudge(0, -0.1)}
-                  className="h-8 border border-gray-300 bg-white disabled:bg-gray-100 disabled:text-gray-400 active:bg-gray-100 rounded-md font-bold text-[#007aff] flex items-center justify-center cursor-pointer transition-colors"
-                >
-                  <Icons.ChevronUp />
-                </button>
-                <div />
-                <button 
-                  disabled={isEditLocked || selIdx === -1}
-                  onClick={() => adjNudge(-0.1, 0)}
-                  className="h-8 border border-gray-300 bg-white disabled:bg-gray-100 disabled:text-gray-400 active:bg-gray-100 rounded-md font-bold text-[#007aff] flex items-center justify-center cursor-pointer transition-colors"
-                >
-                  <Icons.ChevronLeft />
-                </button>
-                <button 
-                  disabled={isEditLocked || selIdx === -1}
-                  onClick={() => adjNudge(0, 0.1)}
-                  className="h-8 border border-gray-300 bg-white disabled:bg-gray-100 disabled:text-gray-400 active:bg-gray-100 rounded-md font-bold text-[#007aff] flex items-center justify-center cursor-pointer transition-colors"
-                >
-                  <Icons.ChevronDown />
-                </button>
-                <button 
-                  disabled={isEditLocked || selIdx === -1}
-                  onClick={() => adjNudge(0.1, 0)}
-                  className="h-8 border border-gray-300 bg-white disabled:bg-gray-100 disabled:text-gray-400 active:bg-gray-100 rounded-md font-bold text-[#007aff] flex items-center justify-center cursor-pointer transition-colors"
-                >
-                  <Icons.ChevronRight />
-                </button>
-              </div>
-
-              {/* Action and Mode Switch Panel */}
-              <div className="flex-1 flex flex-col gap-1.5 justify-start">
-                <div className="flex gap-1.5 w-full">
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
                   <button 
                     onClick={(e) => handleGuideClick('画像保存', e) || exportImage()}
-                    className="flex-1 h-8 bg-green-500 hover:bg-green-600 active:bg-green-700 font-bold text-white text-[10px] rounded-md shadow-sm transition-colors cursor-pointer text-center"
+                    className="flex-1 h-8 bg-white border border-gray-300 rounded-md font-bold text-[10px] text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-1 shadow-sm cursor-pointer"
                   >
-                    画像保存
+                    <Camera size={12} /> クリップ（画像保存）
                   </button>
-                  <button 
-                    id="server-save-btn" 
-                    onClick={saveToCloud}
-                    className="flex-1 h-8 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 font-bold text-white text-[10px] rounded-md shadow-sm transition-colors cursor-pointer"
-                  >
-                    部屋に保存
-                  </button>
+
                   <button 
                     onClick={(e) => handleGuideClick('座標登録', e) || toggleCoordSettingMode()}
-                    className={`flex-1 h-8 font-bold text-[10px] rounded-md shadow-sm transition-colors cursor-pointer border ${isCoordSettingMode ? "bg-amber-500 hover:bg-amber-600 text-white border-amber-500 animate-pulse" : "bg-white hover:bg-gray-50 text-amber-600 border-amber-300 bg-amber-50/20"}`}
+                    className={`flex-1 h-8 rounded-md font-bold text-[10px] flex items-center justify-center gap-1 shadow-sm cursor-pointer border transition-colors ${isCoordSettingMode ? 'bg-amber-500 border-amber-500 text-white' : coordMapping.isValid ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100' : 'bg-white border-amber-500 text-amber-600 hover:bg-amber-50'}`}
                   >
-                    座標登録
+                    <MapPin size={12} /> {isCoordSettingMode ? "座標合わせ中..." : coordMapping.isValid ? "基準座標 調整" : "基準座標 登録 (L字)"}
+                  </button>
+
+                  <button 
+                    onClick={(e) => handleGuideClick('全消去', e) || handleClearAll()}
+                    disabled={isEditLocked}
+                    className={`flex-1 h-8 border rounded-md font-bold text-[10px] flex items-center justify-center gap-1 shadow-sm transition-all cursor-pointer ${clearClickCount === 1 ? "bg-red-500 text-white border-red-500 animate-pulse font-extrabold" : "bg-white border-red-200 text-red-600 hover:bg-red-50 disabled:bg-gray-50 disabled:border-gray-200 disabled:text-gray-400"}`}
+                  >
+                    <Trash2 size={12} /> {clearClickCount === 1 ? "本当によろしいですか？" : "全消去"}
                   </button>
                 </div>
 
                 <div 
-                  className="flex gap-1 items-center"
+                  className="flex items-center gap-2"
                   onClick={(e) => handleGuideClick('モード切替', e)}
                 >
                   <button 
-                    id="lock-toggle" 
                     onClick={toggleEditLock}
                     className={`w-9 h-8 rounded-md border flex items-center justify-center font-bold transition-all shadow-sm shrink-0 text-sm cursor-pointer ${isEditLocked ? "bg-amber-500 text-white border-amber-500" : "bg-white border-amber-500 text-amber-500 hover:bg-[#ff9500]/5"}`}
                     title="編集ロック/閲覧モード"
                   >
-                    {isEditLocked ? <Icons.Lock /> : <Icons.Unlock />}
+                    {isEditLocked ? <Lock size={14} /> : <Unlock size={14} />}
                   </button>
 
                   <button 
@@ -1565,7 +1584,7 @@
                     disabled={isEditLocked}
                     className={`flex-1 h-8 font-bold text-[10px] rounded-md border flex items-center justify-center gap-1 transition-all ${mode === "move" && !isEditLocked ? "bg-[#007aff] text-white border-[#007aff]" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400"}`}
                   >
-                    <Icons.Move /> 移動
+                    <Move size={12} /> 移動
                   </button>
 
                   <button 
@@ -1573,7 +1592,7 @@
                     disabled={isEditLocked}
                     className={`flex-1 h-8 font-bold text-[10px] rounded-md border flex items-center justify-center gap-1 transition-all ${mode === "pen" && !isEditLocked ? "bg-[#007aff] text-white border-[#007aff]" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400"}`}
                   >
-                    <Icons.PenTool /> ペン
+                    <PenTool size={12} /> ペン
                   </button>
 
                   <button 
@@ -1589,14 +1608,41 @@
                     disabled={isEditLocked}
                     className={`flex-1 h-8 font-bold text-[10px] rounded-md border flex items-center justify-center gap-1 transition-all ${mode === "erase" && !isEditLocked ? "bg-[#007aff] text-white border-[#007aff]" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400"}`}
                   >
-                    <Icons.Eraser /> 建物消
+                    <Eraser size={12} /> 建物消
                   </button>
+                </div>
+
+                {/* 選択中のマスのゲーム内座標とコピーボタン */}
+                <div className="flex items-center justify-between gap-1.5 h-8 bg-gray-50 border border-gray-300 rounded-md px-2 text-[10px] text-gray-700 font-bold shadow-inner">
+                  {selectedGrid ? (
+                    <>
+                      <span className="truncate flex items-center gap-1">
+                        📍 {coordMapping.isValid ? (
+                          `X: ${getGameCoords(selectedGrid.gx, selectedGrid.gy)?.x}  Y: ${getGameCoords(selectedGrid.gx, selectedGrid.gy)?.y}`
+                        ) : (
+                          `マス未登録 (GIdx:${Math.round(selectedGrid.gx)}:${Math.round(selectedGrid.gy)})`
+                        )}
+                      </span>
+                      {coordMapping.isValid && (
+                        <button
+                          onClick={() => handleCopyGridCoords(selectedGrid.gx, selectedGrid.gy)}
+                          className="h-6 px-2 bg-[#007aff] hover:bg-[#007aff]/90 text-white rounded font-bold flex items-center gap-0.5 active:scale-95 transition-all text-[8px] tracking-tight shrink-0 cursor-pointer"
+                        >
+                          <Copy size={10} /> コピー
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-[9px] text-gray-400 truncate w-full text-center font-normal">
+                      マップ上をタップして座標を表示
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* 1. Placement Directory Modal */}
+          {/* 1. 配置メンバー一覧名簿モーダル */}
           {showMemOverlay && (
             <div 
               className="fixed inset-0 bg-black/70 z-[3000] flex items-center justify-center p-4"
@@ -1607,8 +1653,8 @@
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="flex justify-between items-center border-b-2 border-[#007aff] pb-2">
-                  <h3 className="text-base font-bold text-gray-800 flex items-center gap-1.5 justify-start">
-                    <Icons.Users /> <span className="ml-[6px]">配置済みメンバー一覧</span>
+                  <h3 className="text-base font-bold text-gray-800 flex items-center gap-1.5">
+                    <Users size={18} className="text-[#007aff]" /> 配置済みメンバー一覧
                   </h3>
                   <button onClick={() => setShowMemOverlay(false)} className="text-gray-500 hover:text-gray-700 font-bold text-lg">
                     ×
@@ -1644,10 +1690,10 @@
             </div>
           )}
 
-          {/* 2. Assets Showcase Modal */}
+          {/* 2. アセット素材選択モーダル */}
           {showAssetOverlay && (
             <div 
-              className="fixed inset-0 bg-black/70 z-[3000] flex items-center justify-center p-4 animate-fade-in"
+              className="fixed inset-0 bg-black/70 z-[3000] flex items-center justify-center p-4"
               onClick={() => setShowAssetOverlay(false)}
             >
               <div 
@@ -1674,8 +1720,8 @@
                       multiple 
                       onChange={(e) => handleFiles(e.target.files)} 
                     />
-                    <Icons.Upload />
-                    <span className="text-[10px] mt-1">オリジナル</span>
+                    <Upload size={24} className="mb-1 text-gray-300" />
+                    <span className="text-[10px]">オリジナル</span>
                   </label>
 
                   {assets.map((a, idx) => (
@@ -1706,19 +1752,19 @@
             </div>
           )}
 
-          {/* 3. Export Image Overlay */}
+          {/* 3. エクスポート画像オーバーレイ */}
           {exportImageUrl && (
             <div 
               className="fixed inset-0 bg-black/85 z-[4000] flex flex-col items-center justify-center p-4 cursor-pointer gap-4"
               onClick={() => setExportImageUrl(null)}
             >
-              <div className="absolute top-4 right-4 text-white bg-slate-800 hover:bg-slate-700 py-1.5 px-3 rounded-full text-xs font-semibold shadow flex items-center gap-1 border border-slate-600">
-                画面クリックで閉じる <Icons.X />
+              <div className="absolute top-4 right-4 text-white bg-slate-800 hover:bg-slate-700 py-1.5 px-3 rounded-full text-xs font-semibold shadow flex items-center gap-1">
+                画面クリックで閉じる <X size={14} />
               </div>
               <img 
                 src={exportImageUrl} 
                 alt="Export" 
-                className="max-w-[95%] max-h-[80vh] border-2 border-white rounded shadow-2xl object-contain animate-scale-up"
+                className="max-w-[95%] max-h-[80vh] border-2 border-white rounded shadow-2xl object-contain"
               />
               <div className="text-white text-xs font-bold bg-black/70 px-4 py-2 rounded-lg text-center leading-normal">
                 画像を長押し、または右クリックして「画像を保存」してください。<br />
@@ -1727,35 +1773,35 @@
             </div>
           )}
 
-          {/* 4. Coordinate Setup HUD Floating Panel */}
+          {/* 4. 座標登録設定モーダル */}
           {isCoordSettingMode && (
             <div 
-              className="fixed inset-x-0 top-[75px] bottom-[235px] z-[2000] bg-transparent pointer-events-none flex flex-col items-center justify-end p-4 animate-fade-in"
+              className="fixed inset-x-0 top-[75px] bottom-[235px] z-[2000] bg-transparent pointer-events-none flex flex-col items-center justify-end p-4"
             >
               <div 
                 className="w-full max-w-sm bg-slate-900/98 border border-amber-600/50 backdrop-blur-md rounded-2xl p-4 shadow-2xl text-white flex flex-col gap-3 pointer-events-auto"
               >
                 <div className="flex justify-between items-center border-b border-amber-500/30 pb-1.5">
-                  <h4 className="text-xs font-extrabold text-amber-400">
+                  <h4 className="text-xs font-extrabold text-amber-400 flex items-center gap-1">
                     📍 基準点(L字) 3か所の座標登録
                   </h4>
                   <button 
                     onClick={() => setIsCoordSettingMode(false)}
                     className="text-slate-400 hover:text-white"
                   >
-                    <Icons.X />
+                    <X size={16} />
                   </button>
                 </div>
 
-                <p className="text-[10px] text-slate-300 leading-normal text-left">
+                <p className="text-[10px] text-slate-300 leading-normal">
                   オレンジ色の3マスセット(A, B, C)をドラッグして、ゲーム内の座標が分かっているマスに置いてください。
                   以下に各マスの「ゲーム内の本当の X:Y 座標」を入力してください。
                 </p>
 
                 <div className="flex flex-col gap-2 my-1">
-                  {/* Anchor Point A */}
+                  {/* 点A */}
                   <div className="flex items-center gap-2 justify-between">
-                    <span className="text-[11px] font-bold text-amber-400 w-16 shrink-0 text-left">
+                    <span className="text-[11px] font-bold text-amber-400 w-16 shrink-0">
                       マスA (x:{coordMapping.refGx}, y:{coordMapping.refGy})
                     </span>
                     <div className="flex gap-1 flex-1">
@@ -1780,9 +1826,9 @@
                     </div>
                   </div>
 
-                  {/* Anchor Point B */}
+                  {/* 点B */}
                   <div className="flex items-center gap-2 justify-between">
-                    <span className="text-[11px] font-bold text-amber-405 w-16 shrink-0 text-left">
+                    <span className="text-[11px] font-bold text-amber-400 w-16 shrink-0">
                       マスB (x:{coordMapping.refGx + 1}, y:{coordMapping.refGy})
                     </span>
                     <div className="flex gap-1 flex-1">
@@ -1807,9 +1853,9 @@
                     </div>
                   </div>
 
-                  {/* Anchor Point C */}
+                  {/* 点C */}
                   <div className="flex items-center gap-2 justify-between">
-                    <span className="text-[11px] font-bold text-amber-400 w-16 shrink-0 text-left">
+                    <span className="text-[11px] font-bold text-amber-400 w-16 shrink-0">
                       マスC (x:{coordMapping.refGx}, y:{coordMapping.refGy + 1})
                     </span>
                     <div className="flex gap-1 flex-1">
@@ -1838,7 +1884,7 @@
                 <div className="flex gap-2 w-full mt-1.5">
                   <button 
                     onClick={() => setIsCoordSettingMode(false)}
-                    className="flex-1 py-2 bg-slate-800 hover:bg-slate-705 border border-slate-700 rounded-lg text-xs font-semibold text-slate-200 shadow transition-colors cursor-pointer"
+                    className="flex-1 py-2 bg-slate-800 hover:bg-slate-755 border border-slate-700 rounded-lg text-xs font-semibold text-slate-255 shadow transition-colors cursor-pointer"
                   >
                     キャンセル
                   </button>
@@ -1857,6 +1903,7 @@
       );
     }
 
+    // Render App
     const container = document.getElementById('root');
     const root = ReactDOM.createRoot(container);
     root.render(<App />);
