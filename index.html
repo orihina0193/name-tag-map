@@ -1123,7 +1123,7 @@
         const canvasX = clientX - rect.left;
         const canvasY = clientY - rect.top;
 
-        const rawG = toG(clientX, clientY);
+        const rawG = toG(canvasX, canvasY);
         const gx_o = Math.floor(rawG.x);
         const gy_o = Math.floor(rawG.y);
         const gx_p = Math.round(rawG.x);
@@ -1259,7 +1259,10 @@
       };
 
       const handleMove = (clientX, clientY, dx, dy) => {
-        const rawG = toG(clientX, clientY);
+        const rect = canvasRef.current?.getBoundingClientRect();
+        const canvasX = rect ? clientX - rect.left : clientX;
+        const canvasY = rect ? clientY - rect.top : clientY;
+        const rawG = toG(canvasX, canvasY);
 
         if (isCoordSettingMode && isDraggingCoordRef.current) {
           const gx = Math.floor(rawG.x);
