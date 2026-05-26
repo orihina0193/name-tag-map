@@ -163,7 +163,7 @@
       const [isEditLocked, setIsEditLocked] = useState(false);
       const [mode, setMode] = useState("move");
       
-      // 基準座標マッピング
+      // 新しい「座標登録モード」
       const [isCoordSettingMode, setIsCoordSettingMode] = useState(false);
       const [coordMapping, setCoordMapping] = useState({
         refGx: 0,
@@ -177,14 +177,14 @@
         isValid: false
       });
       
-      // 座標基準点入力
+      // 座標基準点入力用のstate
       const [coordInput, setCoordInput] = useState({
         aX: "100", aY: "100",
         bX: "101", bY: "100",
         cX: "100", cY: "101"
       });
 
-      // 選択中のマス
+      // タップ/クリックされた現在のマス座標（X:Y コピー用等）
       const [selectedGrid, setSelectedGrid] = useState(null);
       const [copiedNotification, setCopiedNotification] = useState(null);
 
@@ -199,12 +199,12 @@
       const [clearClickCount, setClearClickCount] = useState(0);
       const [isBotPanelCollapsed, setIsBotPanelCollapsed] = useState(false);
 
-      // オーバーレイ
+      // オーバーレイ / モーダル
       const [showMemOverlay, setShowMemOverlay] = useState(false);
       const [showAssetOverlay, setShowAssetOverlay] = useState(false);
       const [exportImageUrl, setExportImageUrl] = useState(null);
 
-      // キャンバス
+      // キャンバス / カメラ Ref
       const canvasRef = useRef(null);
       const camRef = useRef({ x: 0, y: 0, z: 1 });
       const dragRef = useRef(false);
@@ -214,14 +214,17 @@
       const penCurrentRef = useRef(null);
       const lastTRef = useRef({ x: 0, y: 0 });
       const lastDistRef = useRef(0);
+
+      // 座標登録モードでのL字ドラッグ用
       const isDraggingCoordRef = useRef(false);
 
+      // コピー文字列
       const showToast = (msg) => {
         setCopiedNotification(msg);
         setTimeout(() => setCopiedNotification(null), 2500);
       };
 
-      // 画像の自動クロップ (透明な外枠余白を自動でトリムして綺麗に吸着)
+      // 画像のクロップ処理
       const cropImage = (img) => {
         const c = document.createElement("canvas");
         const t = c.getContext("2d");
@@ -254,20 +257,24 @@
         return c2.toDataURL();
       };
 
-      // 等角座標空間(gx, gy) から ゲーム内 X, Y 実座標に線形補完して逆算するロジック
+      // 座標変換用の計算機 (等角グリッド gx, gy からゲーム内 X, Y を算出)
       const getGameCoords = (gx, gy) => {
         if (!coordMapping.isValid) return null;
         const gX = Math.round(gx);
         const gY = Math.round(gy);
+        
+        // Aからの相対的な位置
         const dx = gX - coordMapping.refGx;
         const dy = gY - coordMapping.refGy;
 
+        // 定義された3点から線形補間 (アフィンマッパー)
         const X = coordMapping.x0 + dx * (coordMapping.x1 - coordMapping.x0) + dy * (coordMapping.x2 - coordMapping.x0);
         const Y = coordMapping.y0 + dx * (coordMapping.y1 - coordMapping.y0) + dy * (coordMapping.y2 - coordMapping.y0);
 
         return { x: Math.round(X), y: Math.round(Y) };
       };
 
+      // ガイド表示切り替え
       const toggleGuideMode = () => {
         setGuideMode(!guideMode);
         if (!guideMode) {
@@ -299,6 +306,7 @@
         return true;
       };
 
+      // 編集ロック
       const toggleEditLock = () => {
         if (isEditLocked) {
           if (!confirm("閲覧モードを解除しますか？")) return;
@@ -311,7 +319,7 @@
         }
       };
 
-      // デバイス初期ロード
+      // URLパラメータとデータの初回ロード
       useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const room = params.get("room");
@@ -319,6 +327,7 @@
           setCurrentRoomName(room);
         }
 
+        // 座標マッピングデータの初期化ロード
         const savedMapping = localStorage.getItem("coord_mapping_v1");
         if (savedMapping) {
           try {
@@ -330,13 +339,15 @@
               cX: parsed.x2.toString(), cY: parsed.y2.toString()
             });
           } catch (e) {
-            console.error("Failed to load layout mapping coords:", e);
+            console.error("Failed to load layout map coordinates:", e);
           }
         }
 
+        // プリセットアセットのロード＆クロップ
         loadPresetsAssets();
       }, []);
 
+      // クラウドまたはローカルからの読込
       useEffect(() => {
         if (currentRoomName) {
           loadFromCloud(currentRoomName);
@@ -354,6 +365,7 @@
         }
       };
 
+      // プリセットロード
       const loadPresetsAssets = async () => {
         const loadedAssets = [];
         const hasBackend = window.location.hostname.endsWith("run.app") || window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
@@ -367,15 +379,15 @@
               const i2 = new Image();
               i2.onload = () => {
                 loadedAssets.push({
-                  img: i2,
-                  src,
-                  name: p.name,
-                  defS: p.s,
-                  defO: p.o,
-                  gw: p.gw,
-                  gh: p.gh,
-                  ox: p.ox,
-                  oy: p.oy
+                   img: i2,
+                   src,
+                   name: p.name,
+                   defS: p.s,
+                   defO: p.o,
+                   gw: p.gw,
+                   gh: p.gh,
+                   ox: p.ox,
+                   oy: p.oy
                 });
                 resolve();
               };
@@ -383,6 +395,7 @@
             };
 
             img.onerror = () => {
+              // Direct github fallback
               const directImg = new Image();
               directImg.crossOrigin = "anonymous";
               directImg.onload = () => {
@@ -406,6 +419,7 @@
               };
 
               directImg.onerror = () => {
+                // Local fallback (in same directory)
                 const localImg = new Image();
                 localImg.onload = () => {
                   const src = cropImage(localImg);
@@ -445,6 +459,7 @@
         setAssets(loadedAssets);
       };
 
+      // クラウド読込
       const loadFromCloud = (roomName) => {
         showStatus("サーバーから読込中...", "#ff9500", 0);
         fetch(`${API_ENDPOINT}?room=${encodeURIComponent(roomName)}`)
@@ -467,6 +482,7 @@
           });
       };
 
+      // クラウド保存
       const saveToCloud = () => {
         let room = currentRoomName;
         if (!room) {
@@ -503,11 +519,13 @@
           });
       };
 
+      // ローカル保存
       const saveLocalData = (roomName) => {
         const key = roomName ? `map_${roomName}` : "map_v293";
         localStorage.setItem(key, JSON.stringify({ m: map, l: lines }));
       };
 
+      // ローカル読込
       const loadLocalData = () => {
         const key = currentRoomName ? `map_${currentRoomName}` : "map_v293";
         const s = localStorage.getItem(key);
@@ -522,6 +540,7 @@
         }
       };
 
+      // 新オリジナル画像追加
       const handleFiles = (files) => {
         if (isEditLocked || !files) return;
         for (let i = 0; i < files.length; i++) {
@@ -549,6 +568,7 @@
                       oy: 0
                     }
                   ];
+                  // 新素材を追加したら即それにする
                   setTimeout(() => {
                     setActiveAsset(next.length - 1);
                     setTempAssetStore(next.length - 1);
@@ -568,6 +588,7 @@
         }
       };
 
+      // 基準座標マッピング保存
       const handleRegisterMapping = () => {
         const x0Val = parseFloat(coordInput.aX);
         const y0Val = parseFloat(coordInput.aY);
@@ -599,6 +620,7 @@
         showToast("基準座標を登録し、等角マップ全体の自動計算を有効化しました！");
       };
 
+      // 選択解除
       const deselect = () => {
         setActiveAsset(-1);
         setTempAssetStore(-1);
@@ -607,6 +629,7 @@
         setSelectedGrid(null);
       };
 
+      // カメラを対象建物へ
       const jumpToMember = (id) => {
         const d = map.find((item) => item.id === id);
         if (!d || !canvasRef.current) return;
@@ -625,6 +648,7 @@
         setShowMemOverlay(false);
       };
 
+      // メンバー名更新
       const updateMemberName = (val) => {
         if (isEditLocked) return;
         if (selIdx !== -1) {
@@ -637,6 +661,7 @@
         }
       };
 
+      // スライド操作反映
       const updateItemScale = (scale) => {
         if (isEditLocked || selIdx === -1) return;
         setMap((prev) => {
@@ -685,6 +710,7 @@
         saveLocalData();
       };
 
+      // マップ全初期化
       const handleClearAll = () => {
         if (isEditLocked) return;
         if (clearClickCount === 0) {
@@ -701,6 +727,7 @@
         }
       };
 
+      // コピー動作
       const handleCopyGridCoords = (gx, gy) => {
         const coords = getGameCoords(gx, gy);
         if (!coords) {
@@ -714,6 +741,7 @@
           })
           .catch((err) => {
             console.error("Clipboard copy error:", err);
+            // fallback inside iframe
             const el = document.createElement('textarea');
             el.value = txt;
             document.body.appendChild(el);
@@ -724,6 +752,7 @@
           });
       };
 
+      // クォータービュー座標・画面座標変換公式
       const toS = (gx, gy) => ({
         x: (gx - gy) * (T_W / 2),
         y: (gx + gy) * (T_H / 2)
@@ -739,6 +768,7 @@
         };
       };
 
+      // 重複判定
       const isBlocked = (gx, gy, gw, gh, ignoreId = null) => {
         for (let x = gx; x < gx + gw; x++) {
           for (let y = gy; y < gy + gh; y++) {
@@ -750,6 +780,7 @@
         return false;
       };
 
+      // Canvasリサイズ
       useEffect(() => {
         const handleResize = () => {
           const cvs = canvasRef.current;
@@ -771,9 +802,18 @@
 
         window.addEventListener("resize", handleResize);
         handleResize();
-        return () => window.removeEventListener("resize", handleResize);
-      }, [assets]);
 
+        // パネル折りたたみアニメーション(transition 300ms)に合わせて追従リサイズ
+        const intervals = [50, 100, 150, 200, 250, 300, 350];
+        const timers = intervals.map((t) => setTimeout(handleResize, t));
+
+        return () => {
+          window.removeEventListener("resize", handleResize);
+          timers.forEach(clearTimeout);
+        };
+      }, [assets, isBotPanelCollapsed]);
+
+      // 描画
       const drawMap = () => {
         const cvs = canvasRef.current;
         if (!cvs) return;
@@ -785,6 +825,7 @@
         ctx.translate(camRef.current.x, camRef.current.y);
         ctx.scale(camRef.current.z, camRef.current.z);
 
+        // 1. グリッドの描画
         ctx.strokeStyle = "rgba(0,0,0,0.08)";
         ctx.lineWidth = 1 / camRef.current.z;
         for (let i = -20; i <= 40; i++) {
@@ -803,6 +844,7 @@
           ctx.stroke();
         }
 
+        // 2. 特殊領地の描画
         map.forEach((d) => {
           const a = assets[d.aIdx];
           if (!a) return;
@@ -813,6 +855,7 @@
           }
         });
 
+        // 3. ルート線 (赤) の描画
         lines.forEach((l) => {
           ctx.beginPath();
           ctx.strokeStyle = "rgba(255,0,0,0.6)";
@@ -824,6 +867,7 @@
           ctx.stroke();
         });
 
+        // 4. 配置済み建物のソート・描画
         const sorted = [...map].sort(
           (a, b) => (Math.round(a.x) + Math.round(a.y)) - (Math.round(b.x) + Math.round(b.y))
         );
@@ -860,6 +904,7 @@
           }
         });
 
+        // 5. ギルメン名のバッジテキスト描画
         sorted.forEach((d) => {
           if (!d.mem) return;
           const a = assets[d.aIdx];
@@ -886,6 +931,7 @@
           ctx.restore();
         });
 
+        // 6. ペンルート可視化
         if (mode === "pen" && penStartRef.current && penCurrentRef.current) {
           ctx.beginPath();
           ctx.setLineDash([6 / camRef.current.z, 3 / camRef.current.z]);
@@ -899,6 +945,7 @@
           ctx.setLineDash([]);
         }
 
+        // 7. 選択中マスの強調
         if (selectedGrid) {
           const { gx, gy } = selectedGrid;
           ctx.strokeStyle = "#ff3b30";
@@ -923,6 +970,7 @@
           ctx.fill();
         }
 
+        // 8. 座標設定用の基準点(L字型に連なった3マス)の描画
         if (isCoordSettingMode) {
           const rx = coordMapping.refGx;
           const ry = coordMapping.refGy;
@@ -1006,6 +1054,7 @@
         ctx.stroke();
       };
 
+      // 依存更新
       useEffect(() => {
         drawMap();
       }, [map, lines, selIdx, activeAsset, selectedGrid, coordMapping, isCoordSettingMode, assets]);
@@ -1019,6 +1068,7 @@
         drawMap();
       };
 
+      // 操作
       const handleStart = (clientX, clientY) => {
         if (guideMode) return;
         const rect = canvasRef.current?.getBoundingClientRect();
@@ -1333,7 +1383,7 @@
               部屋: {currentRoomName ? currentRoomName : "未指定 (ローカル)"}
             </div>
 
-            {/* 各種トースト・コピー完了通知 */}
+            {/* コピー完了・各種トースト表示 */}
             {copiedNotification && (
               <div 
                 className="absolute top-24 left-1/2 bg-slate-900 text-white py-2 px-5 rounded-lg text-sm font-semibold shadow-lg z-[2500] text-center border border-slate-700 -translate-x-1/2 animate-toast"
@@ -1430,12 +1480,12 @@
 
           </div>
 
-          {/* ボトムパネル (操作スライダー、開閉トレイ、下部隙間へのコピー座標スペースを融合) */}
+          <!-- ボトムパネル (各種操作スライダー、折りたたみ可能トレイ、モード選択) -->
           <div 
             id="bot-panel" 
             className={`bg-white/98 border-t border-gray-300 px-3 pb-2 pt-0 box-border z-[100] flex flex-col gap-1.5 shrink-0 shadow-lg transition-all duration-300 ${isBotPanelCollapsed ? "h-[45px]" : "h-[228px] sm:h-[228px]"}`}
           >
-            {/* 折りたたみトグル用のヘッダーバー */}
+            <!-- 折りたたみトグル用のヘッダーバー -->
             <div 
               className="flex items-center justify-between py-1 px-3 -mx-3 border-b border-gray-200 bg-gray-50/90 hover:bg-gray-100 cursor-pointer active:bg-gray-200 transition-colors select-none"
               onClick={(e) => {
@@ -1445,6 +1495,7 @@
                 setIsBotPanelCollapsed(!isBotPanelCollapsed);
               }}
             >
+              <!-- 左：閉じる/開く -->
               <div className="flex items-center text-[11px] font-bold text-gray-600 gap-1">
                 {isBotPanelCollapsed ? (
                   <>
@@ -1459,7 +1510,7 @@
                 )}
               </div>
 
-              {/* 選択マスの簡易表示(コピー機能) */}
+              <!-- 右：選択マスの簡易表示(コピー機能付き) -->
               <div className="flex-1 flex justify-end items-center gap-1.5 pl-3 prevent-collapse-toggle">
                 {selectedGrid ? (
                   <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-700 bg-white border border-gray-200 py-0.5 px-2 rounded-full shadow-sm max-w-[200px] truncate">
@@ -1490,9 +1541,9 @@
               </div>
             </div>
 
-            {/* スライドで表示/非表示になる本体コンテンツ */}
+            <!-- スライドで表示/非表示になる本体コンテンツ -->
             <div className={`flex flex-col gap-1.5 overflow-hidden transition-opacity duration-200 ${isBotPanelCollapsed ? "opacity-0 pointer-events-none h-0" : "opacity-100 h-full"}`}>
-              {/* 建物サイズ調整スライダー */}
+              <!-- サイズ調整スライダー -->
               <div 
                 className="flex items-center gap-2 mt-0.5"
                 onClick={(e) => handleGuideClick('サイズ調整', e)}
@@ -1501,7 +1552,7 @@
                 <button 
                   disabled={isEditLocked || selIdx === -1}
                   onClick={() => adjScale(-0.05)}
-                  className="w-8 h-7 sm:w-9 sm:h-8 text-base sm:text-lg border border-gray-300 bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 rounded-md text-[#007aff] cursor-pointer shrink-0 font-bold active:bg-gray-200 transition-colors"
+                  className="w-8 h-7 sm:w-9 sm:h-8 text-base sm:text-lg border border-gray-300 bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 rounded-md text-[#007aff] cursor-pointer shrink-0 font-bold active:bg-gray-200 transition-colors pointer-events-auto"
                 >
                   -
                 </button>
@@ -1518,13 +1569,13 @@
                 <button 
                   disabled={isEditLocked || selIdx === -1}
                   onClick={() => adjScale(0.05)}
-                  className="w-8 h-7 sm:w-9 sm:h-8 text-base sm:text-lg border border-gray-300 bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 rounded-md text-[#007aff] cursor-pointer shrink-0 font-bold active:bg-gray-200 transition-colors"
+                  className="w-8 h-7 sm:w-9 sm:h-8 text-base sm:text-lg border border-gray-300 bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 rounded-md text-[#007aff] cursor-pointer shrink-0 font-bold active:bg-gray-200 transition-colors pointer-events-auto"
                 >
                   +
                 </button>
               </div>
 
-              {/* 前後重なり接地スライダー */}
+              <!-- 接地位置調整スライダー -->
               <div 
                 className="flex items-center gap-2"
                 onClick={(e) => handleGuideClick('接地調整', e)}
@@ -1533,7 +1584,7 @@
                 <button 
                   disabled={isEditLocked || selIdx === -1}
                   onClick={() => adjOffset(-1)}
-                  className="w-8 h-7 sm:w-9 sm:h-8 text-base sm:text-lg border border-gray-300 bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 rounded-md text-[#007aff] cursor-pointer shrink-0 font-bold active:bg-gray-200 transition-colors"
+                  className="w-8 h-7 sm:w-9 sm:h-8 text-base sm:text-lg border border-gray-300 bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 rounded-md text-[#007aff] cursor-pointer shrink-0 font-bold active:bg-gray-200 transition-colors pointer-events-auto"
                 >
                   -
                 </button>
@@ -1550,14 +1601,15 @@
                 <button 
                   disabled={isEditLocked || selIdx === -1}
                   onClick={() => adjOffset(1)}
-                  className="w-8 h-7 sm:w-9 sm:h-8 text-base sm:text-lg border border-gray-300 bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 rounded-md text-[#007aff] cursor-pointer shrink-0 font-bold active:bg-gray-200 transition-colors"
+                  className="w-8 h-7 sm:w-9 sm:h-8 text-base sm:text-lg border border-gray-300 bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 rounded-md text-[#007aff] cursor-pointer shrink-0 font-bold active:bg-gray-200 transition-colors pointer-events-auto"
                 >
                   +
                 </button>
               </div>
 
-              {/* 移動・アンカー位置微調整の十字 */}
+              <!-- 素材移動・調整とモードコントロール -->
               <div className="flex gap-2 sm:gap-2.5 w-full mt-0.5 sm:mt-1">
+                <!-- 微調整用 3x3 グリッド十字 -->
                 <div 
                   id="nudge-grid" 
                   className="grid grid-cols-3 gap-0.5 w-[90px] sm:w-[120px] shrink-0"
@@ -1595,7 +1647,9 @@
                   </button>
                 </div>
 
+                <!-- モード切り替えパネル -->
                 <div className="flex-1 flex flex-col gap-1 justify-start overflow-hidden">
+                  <!-- 任意座標登録とセーブボタン -->
                   <div className="flex gap-1 w-full">
                     <button 
                       onClick={(e) => handleGuideClick('画像保存', e) || exportImage()}
@@ -1611,12 +1665,13 @@
                     </button>
                     <button 
                       onClick={(e) => handleGuideClick('座標登録', e) || toggleCoordSettingMode()}
-                      className={`flex-1 h-7 sm:h-8 font-bold text-[9px] sm:text-[10px] rounded-md shadow-sm transition-colors border truncate px-0.5 ${isCoordSettingMode ? "bg-amber-500 hover:bg-amber-600 text-white border-amber-500 animate-pulse" : "bg-white hover:bg-gray-50 text-amber-600 border-amber-300"}`}
+                      className={`flex-1 h-7 sm:h-8 font-bold text-[9px] sm:text-[10px] rounded-md shadow-sm transition-colors cursor-pointer border truncate px-0.5 ${isCoordSettingMode ? "bg-amber-500 hover:bg-amber-600 text-white border-amber-500 animate-pulse" : "bg-white hover:bg-gray-50 text-amber-600 border-amber-300"}`}
                     >
                       座標登録
                     </button>
                   </div>
 
+                  <!-- 各種のドローイングツール、閲覧・移動ツール -->
                   <div 
                     className="flex gap-0.5 sm:gap-1 items-center"
                     onClick={(e) => handleGuideClick('モード切替', e)}
@@ -1662,7 +1717,7 @@
                     </button>
                   </div>
 
-                  {/* 最新の座標コピー用レイアウトスペース */}
+                  <!-- 選択中のマスのゲーム内座標とコピーボタン -->
                   <div className="flex items-center justify-between gap-1 h-7 sm:h-8 bg-gray-50 border border-gray-300 rounded-md px-1.5 text-[9px] sm:text-[10px] text-gray-700 font-bold shadow-inner">
                     {selectedGrid ? (
                       <>
@@ -1693,7 +1748,7 @@
             </div>
           </div>
 
-          {/* 1. 配置メンバー一覧名簿モーダル */}
+          <!-- 1. 配置メンバー一覧名簿モーダル -->
           {showMemOverlay && (
             <div 
               className="fixed inset-0 bg-black/70 z-[3000] flex items-center justify-center p-4"
@@ -1741,7 +1796,7 @@
             </div>
           )}
 
-          {/* 2. アセット素材選択モーダル */}
+          <!-- 2. アセット素材選択モーダル -->
           {showAssetOverlay && (
             <div 
               className="fixed inset-0 bg-black/70 z-[3000] flex items-center justify-center p-4"
@@ -1803,7 +1858,7 @@
             </div>
           )}
 
-          {/* 3. エクスポート画像オーバーレイ */}
+          <!-- 3. エクスポート画像オーバーレイ -->
           {exportImageUrl && (
             <div 
               className="fixed inset-0 bg-black/85 z-[4000] flex flex-col items-center justify-center p-4 cursor-pointer gap-4"
@@ -1824,7 +1879,7 @@
             </div>
           )}
 
-          {/* 4. 座標登録設定モーダル */}
+          <!-- 4. 座標登録設定モーダル -->
           {isCoordSettingMode && (
             <div 
               className="fixed inset-x-0 top-[75px] bottom-[235px] z-[2000] bg-transparent pointer-events-none flex flex-col items-center justify-end p-4"
@@ -1850,7 +1905,7 @@
                 </p>
 
                 <div className="flex flex-col gap-2 my-1">
-                  {/* 点A */}
+                  <!-- 点A -->
                   <div className="flex items-center gap-2 justify-between">
                     <span className="text-[11px] font-bold text-amber-400 w-16 shrink-0">
                       マスA (x:{coordMapping.refGx}, y:{coordMapping.refGy})
@@ -1877,7 +1932,7 @@
                     </div>
                   </div>
 
-                  {/* 点B */}
+                  <!-- 点B -->
                   <div className="flex items-center gap-2 justify-between">
                     <span className="text-[11px] font-bold text-amber-400 w-16 shrink-0">
                       マスB (x:{coordMapping.refGx + 1}, y:{coordMapping.refGy})
@@ -1904,7 +1959,7 @@
                     </div>
                   </div>
 
-                  {/* 点C */}
+                  <!-- 点C -->
                   <div className="flex items-center gap-2 justify-between">
                     <span className="text-[11px] font-bold text-amber-400 w-16 shrink-0">
                       マスC (x:{coordMapping.refGx}, y:{coordMapping.refGy + 1})
