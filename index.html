@@ -8,9 +8,9 @@
   <!-- CSS Reset & Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2 family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   
-  <!-- Tailwind CSS Play CDN -->
+  <!-- Tailwind CSS Play CDN (perfectly compiles all styling classes) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -34,11 +34,11 @@
   <!-- LZ-String compression CDN (decompress shared cloud strings) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
   
-  <!-- Lucide Icons Core CDN (100% stable global variable "lucide") -->
+  <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
 
   <style>
-    /* Custom CSS animations matching Motion and custom UI */
+    /* Custom CSS animations matching Motion */
     @keyframes slideDownIn {
       0% { opacity: 0; transform: translate(-50%, -20px); }
       100% { opacity: 1; transform: translate(-50%, 0); }
@@ -74,7 +74,7 @@
           const camelName = name.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
           const icon = window.lucide.icons[name] || window.lucide.icons[camelName];
           if (icon) {
-            // Reconstruct the inner HTML of the SVG dynamically
+            // Reconstruct the inner HTML of the SVG
             const inner = icon[2].map(([tag, attrs]) => {
               const attrStr = Object.entries(attrs).map(([k, v]) => `${k}="${v}"`).join(" ");
               return `<${tag} ${attrStr} />`;
@@ -163,6 +163,7 @@
       const [isEditLocked, setIsEditLocked] = useState(false);
       const [mode, setMode] = useState("move");
       
+      // 基準座標マッピング
       const [isCoordSettingMode, setIsCoordSettingMode] = useState(false);
       const [coordMapping, setCoordMapping] = useState({
         refGx: 0,
@@ -176,15 +177,18 @@
         isValid: false
       });
       
+      // 座標基準点入力
       const [coordInput, setCoordInput] = useState({
         aX: "100", aY: "100",
         bX: "101", bY: "100",
         cX: "100", cY: "101"
       });
 
+      // 選択中のマス
       const [selectedGrid, setSelectedGrid] = useState(null);
       const [copiedNotification, setCopiedNotification] = useState(null);
 
+      // ステート群
       const [assets, setAssets] = useState([]);
       const [map, setMap] = useState([]);
       const [lines, setLines] = useState([]);
@@ -193,11 +197,14 @@
       const [tempAssetStore, setTempAssetStore] = useState(-1);
       const [syncStatus, setSyncStatus] = useState(null);
       const [clearClickCount, setClearClickCount] = useState(0);
+      const [isBotPanelCollapsed, setIsBotPanelCollapsed] = useState(false);
 
+      // オーバーレイ
       const [showMemOverlay, setShowMemOverlay] = useState(false);
       const [showAssetOverlay, setShowAssetOverlay] = useState(false);
       const [exportImageUrl, setExportImageUrl] = useState(null);
 
+      // キャンバス
       const canvasRef = useRef(null);
       const camRef = useRef({ x: 0, y: 0, z: 1 });
       const dragRef = useRef(false);
@@ -214,6 +221,7 @@
         setTimeout(() => setCopiedNotification(null), 2500);
       };
 
+      // 画像の自動クロップ (透明な外枠余白を自動でトリムして綺麗に吸着)
       const cropImage = (img) => {
         const c = document.createElement("canvas");
         const t = c.getContext("2d");
@@ -246,14 +254,17 @@
         return c2.toDataURL();
       };
 
+      // 等角座標空間(gx, gy) から ゲーム内 X, Y 実座標に線形補完して逆算するロジック
       const getGameCoords = (gx, gy) => {
         if (!coordMapping.isValid) return null;
         const gX = Math.round(gx);
         const gY = Math.round(gy);
         const dx = gX - coordMapping.refGx;
         const dy = gY - coordMapping.refGy;
+
         const X = coordMapping.x0 + dx * (coordMapping.x1 - coordMapping.x0) + dy * (coordMapping.x2 - coordMapping.x0);
         const Y = coordMapping.y0 + dx * (coordMapping.y1 - coordMapping.y0) + dy * (coordMapping.y2 - coordMapping.y0);
+
         return { x: Math.round(X), y: Math.round(Y) };
       };
 
@@ -300,6 +311,7 @@
         }
       };
 
+      // デバイス初期ロード
       useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const room = params.get("room");
@@ -318,7 +330,7 @@
               cX: parsed.x2.toString(), cY: parsed.y2.toString()
             });
           } catch (e) {
-            console.error(e);
+            console.error("Failed to load layout mapping coords:", e);
           }
         }
 
@@ -336,12 +348,16 @@
       const showStatus = (text, color, autoHideDelay = 3000) => {
         setSyncStatus({ text, color });
         if (autoHideDelay > 0) {
-          setTimeout(() => setSyncStatus(null), autoHideDelay);
+          setTimeout(() => {
+            setSyncStatus(null);
+          }, autoHideDelay);
         }
       };
 
       const loadPresetsAssets = async () => {
         const loadedAssets = [];
+        const hasBackend = window.location.hostname.endsWith("run.app") || window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+
         for (const p of PRESETS) {
           await new Promise((resolve) => {
             const img = new Image();
@@ -390,15 +406,42 @@
               };
 
               directImg.onerror = () => {
-                resolve();
+                const localImg = new Image();
+                localImg.onload = () => {
+                  const src = cropImage(localImg);
+                  const i2 = new Image();
+                  i2.onload = () => {
+                    loadedAssets.push({
+                      img: i2,
+                      src,
+                      name: p.name,
+                      defS: p.s,
+                      defO: p.o,
+                      gw: p.gw,
+                      gh: p.gh,
+                      ox: p.ox,
+                      oy: p.oy
+                    });
+                    resolve();
+                  };
+                  i2.src = src;
+                };
+                localImg.onerror = () => resolve();
+                const relativePath = p.url.includes("img/") ? p.url.slice(p.url.indexOf("img/")) : p.url;
+                localImg.src = relativePath;
               };
               directImg.src = p.url;
             };
 
-            // スタンドアロン環境では直接ロード
-            img.src = p.url;
+            if (hasBackend) {
+              img.src = '/api/proxy-image?url=' + encodeURIComponent(p.url);
+            } else {
+              const relativePath = p.url.includes("img/") ? p.url.slice(p.url.indexOf("img/")) : null;
+              img.src = relativePath || p.url;
+            }
           });
         }
+
         setAssets(loadedAssets);
       };
 
@@ -418,7 +461,7 @@
             }
           })
           .catch((err) => {
-            console.error(err);
+            console.error("Load cloud error:", err);
             showStatus("読込失敗しました", "#ff3b30");
             loadLocalData();
           });
@@ -453,8 +496,9 @@
             saveLocalData(room);
           })
           .catch((err) => {
-            console.error(err);
+            console.error("Save cloud error:", err);
             showStatus("保存エラー", "#ff3b30");
+            alert("サーバー保存に失敗しました。ローカルに保存します。");
             saveLocalData(room);
           });
       };
@@ -473,7 +517,7 @@
             setMap(d.m || []);
             setLines(d.l || []);
           } catch (e) {
-            console.error(e);
+            console.error("Local load error:", e);
           }
         }
       };
@@ -490,28 +534,31 @@
               const src = cropImage(img);
               const i2 = new Image();
               i2.onload = () => {
-                setAssets(prev => [
-                  ...prev,
-                  {
-                    img: i2,
-                    src,
-                    name: null,
-                    defS: 1,
-                    defO: 0,
-                    gw: 1,
-                    gh: 1,
-                    ox: 0,
-                    oy: 0
-                  }
-                ]);
-                setTimeout(() => {
-                  setActiveAsset(assets.length);
-                  setTempAssetStore(assets.length);
-                  setSelIdx(-1);
-                  lockedIdRef.current = null;
-                  setMode("move");
-                  setShowAssetOverlay(false);
-                }, 150);
+                setAssets(prev => {
+                  const next = [
+                    ...prev,
+                    {
+                      img: i2,
+                      src,
+                      name: null,
+                      defS: 1,
+                      defO: 0,
+                      gw: 1,
+                      gh: 1,
+                      ox: 0,
+                      oy: 0
+                    }
+                  ];
+                  setTimeout(() => {
+                    setActiveAsset(next.length - 1);
+                    setTempAssetStore(next.length - 1);
+                    setSelIdx(-1);
+                    lockedIdRef.current = null;
+                    setMode("move");
+                    setShowAssetOverlay(false);
+                  }, 150);
+                  return next;
+                });
               };
               i2.src = src;
             };
@@ -666,7 +713,7 @@
             showToast(`座標 ${txt} をコピーしました！`);
           })
           .catch((err) => {
-            console.error(err);
+            console.error("Clipboard copy error:", err);
             const el = document.createElement('textarea');
             el.value = txt;
             document.body.appendChild(el);
@@ -1226,13 +1273,16 @@
                 handleStart(e.clientX, e.clientY);
               }}
               onMouseMove={(e) => {
-                const dx = e.clientX - lastTRef.current.x;
-                const dy = e.clientY - lastTRef.current.y;
-                lastTRef.current = { x: e.clientX, y: e.clientY };
-                handleMove(e.clientX, e.clientY, dx, dy);
+                if (e.buttons === 1) {
+                  const dx = e.clientX - lastTRef.current.x;
+                  const dy = e.clientY - lastTRef.current.y;
+                  lastTRef.current = { x: e.clientX, y: e.clientY };
+                  handleMove(e.clientX, e.clientY, dx, dy);
+                }
               }}
               onMouseUp={handleEnd}
               onMouseLeave={handleEnd}
+              
               onTouchStart={(e) => {
                 if (e.touches.length === 1) {
                   const t = e.touches[0];
@@ -1240,13 +1290,9 @@
                   handleStart(t.clientX, t.clientY);
                 } else if (e.touches.length === 2) {
                   pinchRef.current = true;
-                  const t1 = e.touches[0];
-                  const t2 = e.touches[1];
-                  lastDistRef.current = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-                  lastTRef.current = {
-                    x: (t1.clientX + t2.clientX) / 2,
-                    y: (t1.clientY + t2.clientY) / 2
-                  };
+                  const dx = e.touches[0].clientX - e.touches[1].clientX;
+                  const dy = e.touches[0].clientY - e.touches[1].clientY;
+                  lastDistRef.current = Math.hypot(dx, dy);
                 }
               }}
               onTouchMove={(e) => {
@@ -1256,655 +1302,549 @@
                   const dy = t.clientY - lastTRef.current.y;
                   lastTRef.current = { x: t.clientX, y: t.clientY };
                   handleMove(t.clientX, t.clientY, dx, dy);
-                } else if (e.touches.length === 2) {
-                  const t1 = e.touches[0];
-                  const t2 = e.touches[1];
-                  const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-                  const mx = (t1.clientX + t2.clientX) / 2;
-                  const my = (t1.clientY + t2.clientY) / 2;
+                } else if (e.touches.length === 2 && pinchRef.current) {
+                  const rect = canvasRef.current.getBoundingClientRect();
+                  const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+                  const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
                   
-                  const zoomRatio = dist / lastDistRef.current;
-                  lastDistRef.current = dist;
-                  lastTRef.current = { x: mx, y: my };
-                  
-                  zoom(zoomRatio, mx, my);
+                  const dx = e.touches[0].clientX - e.touches[1].clientX;
+                  const dy = e.touches[0].clientY - e.touches[1].clientY;
+                  const d = Math.hypot(dx, dy);
+                  if (lastDistRef.current > 0) {
+                    zoom(d / lastDistRef.current, cx, cy);
+                  }
+                  lastDistRef.current = d;
                 }
               }}
-              onTouchEnd={() => {
-                pinchRef.current = false;
-                handleEnd();
+              onTouchEnd={(e) => {
+                if (e.touches.length === 0) {
+                  handleEnd();
+                }
               }}
               onWheel={(e) => {
-                e.preventDefault();
-                const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
-                zoom(zoomFactor, e.clientX, e.clientY);
+                const rect = canvasRef.current.getBoundingClientRect();
+                const scale = e.deltaY < 0 ? 1.08 : 0.92;
+                zoom(scale, e.clientX - rect.left, e.clientY - rect.top);
               }}
             />
 
-            {/* Float Overlay Toolbar Status */}
-            {syncStatus && (
-              <div 
-                className="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full text-xs font-bold text-white shadow-lg pointer-events-none transition-all duration-300 z-50 flex items-center gap-1.5"
-                style={{ backgroundColor: syncStatus.color }}
-              >
-                <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                {syncStatus.text}
-              </div>
-            )}
+            {/* 画面左上のバッジ情報 */}
+            <div id="room-badge" className="absolute top-[75px] left-[15px] bg-black/85 text-white py-1.5 px-3 rounded-full text-xs font-bold z-[500] pointer-events-none shadow-md">
+              部屋: {currentRoomName ? currentRoomName : "未指定 (ローカル)"}
+            </div>
 
-            {/* Notification toast */}
+            {/* 各種トースト・コピー完了通知 */}
             {copiedNotification && (
-              <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-700/80 text-white text-xs px-4 py-2.5 rounded-full shadow-2xl font-bold animate-toast z-50 flex items-center gap-1.5 whitespace-nowrap">
-                <Check size={14} className="text-emerald-400" />
+              <div 
+                className="absolute top-24 left-1/2 bg-slate-900 text-white py-2 px-5 rounded-lg text-sm font-semibold shadow-lg z-[2500] text-center border border-slate-700 -translate-x-1/2 animate-toast"
+              >
                 {copiedNotification}
               </div>
             )}
 
-            {/* FLOATING TOP UTILITY RAIL */}
-            <div className="absolute top-3 left-3 flex flex-col gap-2 z-40 max-w-[calc(100vw-24px)] pointer-events-none">
-              <div className="flex items-center gap-2 pointer-events-auto bg-white/90 backdrop-blur-md px-3 py-2 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.08)] border border-white/50">
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">MAP COMPASS</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-sm font-black text-slate-800 font-mono">
-                      {currentRoomName ? `ROOM: ${currentRoomName}` : "LOCAL DRAFT"}
-                    </span>
-                  </div>
-                </div>
-                
-                <div className="h-6 w-px bg-slate-200/80 mx-1" />
-
-                <div className="flex items-center gap-1">
-                  <button 
-                    onClick={saveToCloud}
-                    disabled={isEditLocked}
-                    className={`p-2 rounded-xl transition-all ${isEditLocked ? "opacity-30 cursor-not-allowed" : "hover:bg-slate-100 text-slate-700 hover:text-blue-600 active:scale-95 cursor-pointer"}`}
-                    title="クラウド保存"
-                  >
-                    <Save size={18} />
-                  </button>
-                  <button 
-                    onClick={() => setShowMemOverlay(true)}
-                    className="p-2 rounded-xl hover:bg-slate-100 text-slate-700 hover:text-purple-600 active:scale-95 transition-all cursor-pointer"
-                    title="名簿"
-                  >
-                    <Users size={18} />
-                  </button>
-                  <button 
-                    onClick={exportImage}
-                    className="p-2 rounded-xl hover:bg-slate-100 text-slate-700 hover:text-emerald-600 active:scale-95 transition-all cursor-pointer"
-                    title="画像としてエクスポート"
-                  >
-                    <Camera size={18} />
-                  </button>
-                  <button 
-                    onClick={toggleEditLock}
-                    className={`p-2 rounded-xl transition-all ${isEditLocked ? "bg-amber-500 text-white shadow shadow-amber-500/20" : "hover:bg-slate-100 text-slate-700 hover:text-amber-500"} cursor-pointer`}
-                    title={isEditLocked ? "閲覧モード (編集ロック中)" : "通常モード"}
-                  >
-                    {isEditLocked ? <Lock size={18} /> : <Unlock size={18} />}
-                  </button>
-                  <button 
-                    onClick={toggleGuideMode}
-                    className={`p-2 rounded-xl transition-all ${guideMode ? "bg-indigo-600 text-white shadow shadow-indigo-500/20" : "hover:bg-slate-100 text-indigo-600 hover:bg-indigo-50"} cursor-pointer`}
-                    title="ガイド説明ヘルプ"
-                  >
-                    <HelpCircle size={18} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Selected point coordinates bar */}
-              {selectedGrid && (
-                <div className="flex items-center gap-2 pointer-events-auto bg-slate-900 border border-slate-800 text-white px-3.5 py-2.5 rounded-2xl shadow-xl w-fit">
-                  <span className="text-[10px] bg-red-500 text-white font-mono px-1.5 py-0.5 rounded font-bold uppercase shrink-0">POINT</span>
-                  <div className="flex flex-col font-mono leading-tight">
-                    <span className="text-[10px] text-slate-400">GRID (X, Y)</span>
-                    <span className="text-xs font-bold font-mono text-slate-100">{selectedGrid.gx} , {selectedGrid.gy}</span>
-                  </div>
-                  
-                  {coordMapping.isValid ? (
-                    <>
-                      <div className="h-6 w-px bg-slate-800 shrink-0" />
-                      <div className="flex flex-col font-mono leading-tight min-w-[65px]">
-                        <span className="text-[10px] text-amber-400">GAME IN</span>
-                        <span className="text-xs font-black font-mono text-amber-300">
-                          {getGameCoords(selectedGrid.gx, selectedGrid.gy) ? `${getGameCoords(selectedGrid.gx, selectedGrid.gy).x}:${getGameCoords(selectedGrid.gx, selectedGrid.gy).y}` : "----:----"}
-                        </span>
-                      </div>
-                      <button 
-                        onClick={() => handleCopyGridCoords(selectedGrid.gx, selectedGrid.gy)}
-                        className="p-1 px-2.5 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
-                      >
-                        <Copy size={11} /> 座標コピー
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <div className="h-6 w-px bg-slate-800 shrink-0" />
-                      <span className="text-[10px] text-slate-400 max-w-[120px] leading-tight">
-                        「座標登録」頂くと、本マスのゲーム内座標の自動表示・コピー機能が解放されます
-                      </span>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* GUIDE BANNER ON BOTTOM */}
-            {guideMode && (
-              <div className="absolute bottom-20 left-1/2 -translate-x-1/2 w-[90%] max-w-md pointer-events-auto bg-indigo-900 text-indigo-100 text-xs px-4 py-3 rounded-2xl shadow-2xl border border-indigo-700/80 z-40 flex items-start gap-2.5 animate-guide" id="guide-banner">
-                <HelpCircle size={16} className="text-indigo-400 shrink-0 mt-0.5" />
-                <div className="flex-1 flex flex-col gap-0.5">
-                  <span className="font-bold text-indigo-300">💡 ガイド表示有効中</span>
-                  <p className="leading-relaxed font-semibold text-white">{guideText}</p>
-                </div>
-                <button 
-                  onClick={toggleGuideMode}
-                  className="p-1 text-indigo-300 hover:text-white rounded transition-colors cursor-pointer"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            )}
-
-            {/* CANVAS INTERACTIVE BUTTON BANNER ON RIGHT/BOTTOM */}
-            <div className="absolute bottom-3 right-3 flex flex-col gap-2.5 items-end z-40">
-              
-              {/* MODES TRAIL PANEL */}
+            {/* 同期ステータス */}
+            {syncStatus && (
               <div 
-                className="flex items-center gap-1.5 bg-white/90 backdrop-blur-md p-1.5 rounded-2xl shadow-lg border border-white/50"
-                onClick={(e) => handleGuideClick('モード切替', e)}
+                id="sync-status" 
+                style={{ backgroundColor: syncStatus.color }}
+                className="absolute top-[75px] right-[65px] text-white py-1.5 px-3 rounded-full text-xs font-bold z-[500] shadow-md transition-all duration-300"
               >
-                <button 
-                  onClick={() => {
-                    if (isEditLocked) return;
-                    setMode("move");
-                  }}
-                  disabled={isEditLocked}
-                  className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${isEditLocked ? "opacity-30 cursor-not-allowed" : mode === 'move' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-700 hover:bg-slate-100'}`}
-                >
-                  <Move size={14} /> 移動・設置
-                </button>
-                <button 
-                  onClick={() => {
-                    if (isEditLocked) return;
-                    setMode("pen");
-                  }}
-                  disabled={isEditLocked}
-                  className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${isEditLocked ? "opacity-30 cursor-not-allowed" : mode === 'pen' ? 'bg-red-500 text-white shadow-md' : 'text-slate-700 hover:bg-slate-100'}`}
-                >
-                  <PenTool size={14} /> ルート描画
-                </button>
-                <button 
-                  onClick={() => {
-                    if (isEditLocked) return;
-                    setMode("p-erase");
-                  }}
-                  disabled={isEditLocked}
-                  className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${isEditLocked ? "opacity-30 cursor-not-allowed" : mode === 'p-erase' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-700 hover:bg-slate-100'}`}
-                >
-                  <Eraser size={14} /> ルート消し
-                </button>
-                <button 
-                  onClick={() => {
-                    if (isEditLocked) return;
-                    setMode("erase");
-                  }}
-                  disabled={isEditLocked}
-                  className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${isEditLocked ? "opacity-30 cursor-not-allowed" : mode === 'erase' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-700 hover:bg-slate-100'}`}
-                >
-                  <Trash2 size={14} /> 建物消去
-                </button>
-              </div>
-
-              {/* MAIN FUNCTION TRAY */}
-              <div className="flex gap-2.5">
-                {/* 座標登録ボタン（等角基準をドラッグで指定し、自動マッピングを開始） */}
-                <button 
-                  onClick={(e) => {
-                    if (handleGuideClick('座標登録', e)) return;
-                    if (isEditLocked) return;
-                    toggleCoordSettingMode();
-                  }}
-                  disabled={isEditLocked}
-                  className={`px-4 py-2.5 rounded-2xl border text-xs font-extrabold shadow-lg transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer ${isEditLocked ? 'bg-slate-200 border-slate-100 text-slate-400 cursor-not-allowed shadow-none' : isCoordSettingMode ? 'bg-amber-500 text-white border-amber-500 shadow-amber-500/20' : 'bg-slate-900 text-white border-slate-900 hover:bg-slate-800'}`}
-                >
-                  <MapPin size={15} /> {isCoordSettingMode ? "座標登録を終了" : "座標登録"}
-                </button>
-
-                <button 
-                  onClick={(e) => {
-                    if (handleGuideClick('素材追加', e)) return;
-                    if (isEditLocked) return;
-                    setShowAssetOverlay(true);
-                  }}
-                  disabled={isEditLocked}
-                  className={`px-4 py-2.5 rounded-2xl text-xs font-extrabold shadow-lg transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer ${isEditLocked ? 'bg-slate-200 border-slate-100 text-slate-400 cursor-not-allowed shadow-none' : 'bg-blue-600 text-white border border-blue-600 hover:bg-blue-500 hover:shadow-blue-500/20'}`}
-                >
-                  <Plus size={15} /> 素材追加
-                </button>
-
-                <button 
-                  onClick={(e) => {
-                    if (handleGuideClick('全消去', e)) return;
-                    if (isEditLocked) return;
-                    handleClearAll();
-                  }}
-                  disabled={isEditLocked}
-                  className={`px-4 py-2.5 rounded-2xl text-xs font-extrabold border shadow-lg transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer ${isEditLocked ? 'bg-slate-200 border-slate-100 text-slate-400 cursor-not-allowed shadow-none' : clearClickCount === 1 ? 'bg-red-600 text-white border-red-600 animate-pulse' : 'bg-white text-slate-700 border-slate-200/80 hover:bg-slate-50'}`}
-                >
-                  <Trash2 size={15} /> {clearClickCount === 1 ? "もう一度タップで消去！" : "全体消去"}
-                </button>
-              </div>
-
-            </div>
-
-            {/* SELECTION SETTINGS BAR ON LOWER-LEFT */}
-            {selIdx !== -1 && map[selIdx] && (
-              <div className="absolute bottom-3 left-3 bg-white/95 backdrop-blur-md p-4 rounded-3xl shadow-[0_12px_44px_rgba(0,0,0,0.12)] border border-white/60 w-[310px] z-40 max-h-[85vh] overflow-y-auto flex flex-col gap-3.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex flex-col">
-                    <span className="text-[9px] font-bold text-slate-400 tracking-wider font-mono">SELECTED ITEM</span>
-                    <span className="text-sm font-black text-slate-800">配置データの編集</span>
-                  </div>
-                  <button 
-                    onClick={(e) => {
-                      if (handleGuideClick('選択解除', e)) return;
-                      deselect();
-                    }}
-                    className="p-1 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded-lg transition-colors cursor-pointer"
-                  >
-                    選択解除
-                  </button>
-                </div>
-
-                <div className="h-px bg-slate-100" />
-
-                {/* ギルメン名入力 */}
-                <div className="flex flex-col gap-1.5" onClick={(e) => handleGuideClick('ギルメン名', e)}>
-                  <label className="text-[10px] font-bold text-slate-500 flex items-center gap-1 font-sans">
-                    <Users size={12} className="text-slate-400" /> ギルメン名・テキスト表示
-                  </label>
-                  <input 
-                    type="text"
-                    value={map[selIdx].mem || ""}
-                    onChange={(e) => updateMemberName(e.target.value)}
-                    placeholder="名前を入力 (例: るる、HQ3号等)"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-sans"
-                  />
-                </div>
-
-                {/* サイズ調整 */}
-                <div className="flex flex-col gap-1" onClick={(e) => handleGuideClick('サイズ調整', e)}>
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-bold text-slate-500">スケール調整 (サイズ)</span>
-                    <span className="text-xs font-mono font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">{map[selIdx].s}x</span>
-                  </div>
-                  <div className="flex gap-2 items-center mt-1">
-                    <button 
-                      onClick={() => adjScale(-0.05)}
-                      className="p-1 w-7 h-7 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold text-slate-700 flex items-center justify-center transition-transform active:scale-95 cursor-pointer"
-                    >
-                      －
-                    </button>
-                    <input 
-                      type="range"
-                      min="0.1"
-                      max="3.0"
-                      step="0.05"
-                      value={map[selIdx].s}
-                      onChange={(e) => updateItemScale(parseFloat(e.target.value))}
-                      className="flex-1 accent-indigo-600 cursor-pointer"
-                    />
-                    <button 
-                      onClick={() => adjScale(0.05)}
-                      className="p-1 w-7 h-7 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold text-slate-700 flex items-center justify-center transition-transform active:scale-95 cursor-pointer"
-                    >
-                      ＋
-                    </button>
-                  </div>
-                </div>
-
-                {/* 接地微調整 */}
-                <div className="flex flex-col gap-1" onClick={(e) => handleGuideClick('接地調整', e)}>
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-bold text-slate-500">高低調整 (重なり・前後描画)</span>
-                    <span className="text-xs font-mono font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">{map[selIdx].off}px</span>
-                  </div>
-                  <div className="flex gap-2 items-center mt-1">
-                    <button 
-                      onClick={() => adjOffset(-1)}
-                      className="p-1 w-7 h-7 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold text-slate-700 flex items-center justify-center transition-transform active:scale-95 cursor-pointer"
-                    >
-                      －
-                    </button>
-                    <input 
-                      type="range"
-                      min="-50"
-                      max="50"
-                      step="1"
-                      value={map[selIdx].off}
-                      onChange={(e) => updateItemOffset(parseInt(e.target.value))}
-                      className="flex-1 accent-indigo-600 cursor-pointer"
-                    />
-                    <button 
-                      onClick={() => adjOffset(1)}
-                      className="p-1 w-7 h-7 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold text-slate-700 flex items-center justify-center transition-transform active:scale-95 cursor-pointer"
-                    >
-                      ＋
-                    </button>
-                  </div>
-                </div>
-
-                {/* グリッドアンカー微調整 (十字キー) */}
-                <div className="flex flex-col gap-1.5" onClick={(e) => handleGuideClick('微調整', e)}>
-                  <span className="text-[10px] font-bold text-slate-500">位置アンカー微調整</span>
-                  <div className="flex justify-between items-center">
-                    <div className="grid grid-cols-3 gap-1.5 w-[110px]">
-                      <div />
-                      <button 
-                        onClick={() => adjNudge(0, -0.05)}
-                        className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-transform active:scale-90 flex items-center justify-center cursor-pointer"
-                        title="上"
-                      >
-                        <ChevronUp size={14} />
-                      </button>
-                      <div />
-                      
-                      <button 
-                        onClick={() => adjNudge(-0.05, 0)}
-                        className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-transform active:scale-90 flex items-center justify-center cursor-pointer"
-                        title="左"
-                      >
-                        <ChevronLeft size={14} />
-                      </button>
-                      <div className="flex items-center justify-center text-[9px] font-bold font-mono text-slate-400">
-                        P
-                      </div>
-                      <button 
-                        onClick={() => adjNudge(0.05, 0)}
-                        className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-transform active:scale-90 flex items-center justify-center cursor-pointer"
-                        title="右"
-                      >
-                        <ChevronRight size={14} />
-                      </button>
-
-                      <div />
-                      <button 
-                        onClick={() => adjNudge(0, 0.05)}
-                        className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-transform active:scale-90 flex items-center justify-center cursor-pointer"
-                        title="下"
-                      >
-                        <ChevronDown size={14} />
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setMap(prev => {
-                            const next = [...prev];
-                            const designAsset = assets[next[selIdx].aIdx];
-                            next[selIdx] = {
-                              ...next[selIdx],
-                              ox: designAsset ? designAsset.ox : 0,
-                              oy: designAsset ? designAsset.oy : 0
-                            };
-                            return next;
-                          });
-                          saveLocalData();
-                        }}
-                        className="p-1 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-lg text-[9px] font-bold flex items-center justify-center transition-all cursor-pointer"
-                        title="初期値にリセット"
-                      >
-                        <RotateCcw size={11} />
-                      </button>
-                    </div>
-
-                    <div className="flex flex-col text-right font-mono text-[10px] text-slate-400 gap-0.5 min-w-[120px]">
-                      <div>OFFSET X: <span className="font-bold text-slate-705">{map[selIdx].ox >= 0 ? `+${map[selIdx].ox}` : map[selIdx].ox}</span></div>
-                      <div>OFFSET Y: <span className="font-bold text-slate-705">{map[selIdx].oy >= 0 ? `+${map[selIdx].oy}` : map[selIdx].oy}</span></div>
-                    </div>
-                  </div>
-                </div>
-
+                {syncStatus.text}
               </div>
             )}
+
+            {/* 右上のヘルプ・ガイドトリガー */}
+            <button 
+              id="guide-trigger" 
+              onClick={toggleGuideMode}
+              className={`absolute top-[75px] right-[15px] w-10 h-10 text-white rounded-full flex items-center justify-center font-bold text-xl z-[500] shadow-lg border-2 border-white cursor-pointer transition-colors ${guideMode ? "bg-[#ff3b30]" : "bg-[#007aff]/90"}`}
+            >
+              {guideMode ? "×" : "?"}
+            </button>
+
+            {/* ガイドメッセージ表示ボックス */}
+            {guideMode && (
+              <div 
+                id="guide-msg-box" 
+                className="absolute top-[125px] left-1/2 w-[85%] max-w-[400px] bg-black/90 text-white p-3.5 rounded-xl text-xs leading-relaxed z-[2500] text-center border border-white/20 shadow-xl -translate-x-1/2 animate-guide"
+              >
+                <div className="font-bold text-[#34c759] mb-1">💡 ガイドモード</div>
+                {guideText}
+              </div>
+            )}
+
+            {/* トップコントロールパネル */}
+            <div id="top-panel" className="absolute top-0 w-full h-[65px] bg-white/95 border-b border-gray-300 flex items-center px-1.5 sm:px-3.5 box-border z-[100] gap-1 sm:gap-2 shadow-sm">
+              <div 
+                id="cur-box" 
+                onClick={(e) => handleGuideClick('選択解除', e) || deselect()}
+                className={`w-10 h-10 sm:w-12 sm:h-12 border-2 border-[#007aff] rounded-lg bg-white bg-contain bg-no-repeat bg-center flex-shrink-0 cursor-pointer relative shadow-inner ${selIdx !== -1 || activeAsset !== -1 ? "after:content-['解除'] after:absolute after:bottom-[-2px] after:right-[-2px] after:bg-[#007aff] after:text-white after:text-[7px] sm:after:text-[8px] after:px-0.5 sm:after:px-1 after:rounded-md" : ""}`}
+                style={{ 
+                  backgroundImage: selIdx !== -1 && map[selIdx]?.aIdx !== undefined && assets[map[selIdx].aIdx]
+                    ? `url(${assets[map[selIdx].aIdx].src})` 
+                    : activeAsset !== -1 && assets[activeAsset] 
+                    ? `url(${assets[activeAsset].src})` 
+                    : "none" 
+                }}
+                title="選択解除"
+              />
+
+              <input 
+                type="text" 
+                id="member-name-in" 
+                placeholder={selIdx !== -1 ? "名前を入力" : "タップで名前指定"}
+                disabled={isEditLocked || selIdx === -1}
+                value={selIdx !== -1 && map[selIdx] ? map[selIdx].mem : ""}
+                onChange={(e) => updateMemberName(e.target.value)}
+                onClick={(e) => {
+                  if (guideMode) {
+                    handleGuideClick('ギルメン名', e);
+                    e.target.blur();
+                  }
+                }}
+                className="flex-1 h-10 sm:h-11 border border-gray-300 rounded-lg px-2 sm:px-3 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#007aff] bg-white disabled:bg-gray-100 disabled:text-gray-500 font-medium transition-all"
+              />
+
+              <button 
+                className="top-btn w-10 h-10 sm:w-11 sm:h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 flex items-center justify-center flex-shrink-0 cursor-pointer shadow-sm text-base sm:text-lg"
+                onClick={(e) => handleGuideClick('名簿', e) || setShowMemOverlay(true)}
+                title="名簿"
+              >
+                👥
+              </button>
+              <button 
+                className="top-btn w-10 h-10 sm:w-11 sm:h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 flex items-center justify-center flex-shrink-0 cursor-pointer shadow-sm text-base sm:text-lg"
+                onClick={(e) => handleGuideClick('素材追加', e) || setShowAssetOverlay(true)}
+                title="素材追加"
+              >
+                ＋
+              </button>
+              <button 
+                className={`top-clr-btn h-10 px-2 sm:px-3 rounded-lg text-white font-bold text-xs flex items-center justify-center flex-shrink-0 cursor-pointer border-none shadow-sm transition-colors ${clearClickCount === 1 ? "bg-amber-500 animate-pulse" : "bg-red-500 hover:bg-red-600"}`}
+                onClick={(e) => handleGuideClick('全消去', e) || handleClearAll()}
+                title="全消去"
+              >
+                {clearClickCount === 1 ? "確定" : "全消去"}
+              </button>
+            </div>
 
           </div>
 
-          {/* ASSET SELECT OVERLAY */}
-          {showAssetOverlay && (
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-3xl w-full max-w-lg p-5 flex flex-col gap-4 shadow-2xl border border-white/20 animate-toast">
-                <div className="flex justify-between items-center">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">ASSET LIBRARY</span>
-                    <h3 className="text-lg font-black text-slate-800">配置用オブジェクトの追加</h3>
+          {/* ボトムパネル (操作スライダー、開閉トレイ、下部隙間へのコピー座標スペースを融合) */}
+          <div 
+            id="bot-panel" 
+            className={`bg-white/98 border-t border-gray-300 px-3 pb-2 pt-0 box-border z-[100] flex flex-col gap-1.5 shrink-0 shadow-lg transition-all duration-300 ${isBotPanelCollapsed ? "h-[45px]" : "h-[228px] sm:h-[228px]"}`}
+          >
+            {/* 折りたたみトグル用のヘッダーバー */}
+            <div 
+              className="flex items-center justify-between py-1 px-3 -mx-3 border-b border-gray-200 bg-gray-50/90 hover:bg-gray-100 cursor-pointer active:bg-gray-200 transition-colors select-none"
+              onClick={(e) => {
+                if (e.target.closest(".prevent-collapse-toggle")) {
+                  return;
+                }
+                setIsBotPanelCollapsed(!isBotPanelCollapsed);
+              }}
+            >
+              <div className="flex items-center text-[11px] font-bold text-gray-600 gap-1">
+                {isBotPanelCollapsed ? (
+                  <>
+                    <ChevronUp size={14} className="text-[#007aff]" /> 
+                    <span className="text-[10px] sm:text-[11px]">調整パネルを開く</span>
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown size={14} className="text-gray-400" />
+                    <span className="text-[10px] sm:text-[11px]">調整パネルを隠す</span>
+                  </>
+                )}
+              </div>
+
+              {/* 選択マスの簡易表示(コピー機能) */}
+              <div className="flex-1 flex justify-end items-center gap-1.5 pl-3 prevent-collapse-toggle">
+                {selectedGrid ? (
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-700 bg-white border border-gray-200 py-0.5 px-2 rounded-full shadow-sm max-w-[200px] truncate">
+                    <span className="truncate">
+                      📍 {coordMapping.isValid ? (
+                        `X:${getGameCoords(selectedGrid.gx, selectedGrid.gy)?.x} Y:${getGameCoords(selectedGrid.gx, selectedGrid.gy)?.y}`
+                      ) : (
+                        `マス:${Math.round(selectedGrid.gx)}:${Math.round(selectedGrid.gy)}`
+                      )}
+                    </span>
+                    {coordMapping.isValid && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCopyGridCoords(selectedGrid.gx, selectedGrid.gy);
+                        }}
+                        className="py-0.5 px-1.5 bg-[#007aff] hover:bg-[#007aff]/90 text-white rounded text-[8px] font-bold flex items-center gap-0.5 whitespace-nowrap"
+                      >
+                        <Copy size={8} />
+                      </button>
+                    )}
                   </div>
+                ) : (
+                  <span className="text-[9px] text-gray-400 truncate">
+                    タップで座標表示
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* スライドで表示/非表示になる本体コンテンツ */}
+            <div className={`flex flex-col gap-1.5 overflow-hidden transition-opacity duration-200 ${isBotPanelCollapsed ? "opacity-0 pointer-events-none h-0" : "opacity-100 h-full"}`}>
+              {/* 建物サイズ調整スライダー */}
+              <div 
+                className="flex items-center gap-2 mt-0.5"
+                onClick={(e) => handleGuideClick('サイズ調整', e)}
+              >
+                <label className="text-[11px] font-bold w-9 shrink-0 text-gray-500">サイズ</label>
+                <button 
+                  disabled={isEditLocked || selIdx === -1}
+                  onClick={() => adjScale(-0.05)}
+                  className="w-8 h-7 sm:w-9 sm:h-8 text-base sm:text-lg border border-gray-300 bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 rounded-md text-[#007aff] cursor-pointer shrink-0 font-bold active:bg-gray-200 transition-colors"
+                >
+                  -
+                </button>
+                <input 
+                  type="range" 
+                  min="0.1" 
+                  max="5" 
+                  step="0.05"
+                  disabled={isEditLocked || selIdx === -1}
+                  value={selIdx !== -1 && map[selIdx] ? map[selIdx].s : 1}
+                  onChange={(e) => updateItemScale(parseFloat(e.target.value))}
+                  className="flex-1 h-7 sm:h-9 cursor-pointer accent-[#007aff]"
+                />
+                <button 
+                  disabled={isEditLocked || selIdx === -1}
+                  onClick={() => adjScale(0.05)}
+                  className="w-8 h-7 sm:w-9 sm:h-8 text-base sm:text-lg border border-gray-300 bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 rounded-md text-[#007aff] cursor-pointer shrink-0 font-bold active:bg-gray-200 transition-colors"
+                >
+                  +
+                </button>
+              </div>
+
+              {/* 前後重なり接地スライダー */}
+              <div 
+                className="flex items-center gap-2"
+                onClick={(e) => handleGuideClick('接地調整', e)}
+              >
+                <label className="text-[11px] font-bold w-9 shrink-0 text-gray-500">接地</label>
+                <button 
+                  disabled={isEditLocked || selIdx === -1}
+                  onClick={() => adjOffset(-1)}
+                  className="w-8 h-7 sm:w-9 sm:h-8 text-base sm:text-lg border border-gray-300 bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 rounded-md text-[#007aff] cursor-pointer shrink-0 font-bold active:bg-gray-200 transition-colors"
+                >
+                  -
+                </button>
+                <input 
+                  type="range" 
+                  min="-100" 
+                  max="100" 
+                  step="1"
+                  disabled={isEditLocked || selIdx === -1}
+                  value={selIdx !== -1 && map[selIdx] ? map[selIdx].off : 0}
+                  onChange={(e) => updateItemOffset(parseInt(e.target.value))}
+                  className="flex-1 h-7 sm:h-9 cursor-pointer accent-[#007aff]"
+                />
+                <button 
+                  disabled={isEditLocked || selIdx === -1}
+                  onClick={() => adjOffset(1)}
+                  className="w-8 h-7 sm:w-9 sm:h-8 text-base sm:text-lg border border-gray-300 bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 rounded-md text-[#007aff] cursor-pointer shrink-0 font-bold active:bg-gray-200 transition-colors"
+                >
+                  +
+                </button>
+              </div>
+
+              {/* 移動・アンカー位置微調整の十字 */}
+              <div className="flex gap-2 sm:gap-2.5 w-full mt-0.5 sm:mt-1">
+                <div 
+                  id="nudge-grid" 
+                  className="grid grid-cols-3 gap-0.5 w-[90px] sm:w-[120px] shrink-0"
+                  onClick={(e) => handleGuideClick('微調整', e)}
+                >
+                  <div />
                   <button 
-                    onClick={() => setShowAssetOverlay(false)}
-                    className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
+                    disabled={isEditLocked || selIdx === -1}
+                    onClick={() => adjNudge(0, -0.1)}
+                    className="h-7 sm:h-8 border border-gray-300 bg-white disabled:bg-gray-100 disabled:text-gray-400 active:bg-gray-100 rounded-md font-bold text-[#007aff] flex items-center justify-center cursor-pointer transition-colors"
                   >
-                    <X size={20} />
+                    <ChevronUp size={14} />
+                  </button>
+                  <div />
+                  <button 
+                    disabled={isEditLocked || selIdx === -1}
+                    onClick={() => adjNudge(-0.1, 0)}
+                    className="h-7 sm:h-8 border border-gray-300 bg-white disabled:bg-gray-100 disabled:text-gray-400 active:bg-gray-100 rounded-md font-bold text-[#007aff] flex items-center justify-center cursor-pointer transition-colors"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  <button 
+                    disabled={isEditLocked || selIdx === -1}
+                    onClick={() => adjNudge(0, 0.1)}
+                    className="h-7 sm:h-8 border border-gray-300 bg-white disabled:bg-gray-100 disabled:text-gray-400 active:bg-gray-100 rounded-md font-bold text-[#007aff] flex items-center justify-center cursor-pointer transition-colors"
+                  >
+                    <ChevronDown size={14} />
+                  </button>
+                  <button 
+                    disabled={isEditLocked || selIdx === -1}
+                    onClick={() => adjNudge(0.1, 0)}
+                    className="h-7 sm:h-8 border border-gray-300 bg-white disabled:bg-gray-100 disabled:text-gray-400 active:bg-gray-100 rounded-md font-bold text-[#007aff] flex items-center justify-center cursor-pointer transition-colors"
+                  >
+                    <ChevronRight size={14} />
                   </button>
                 </div>
 
-                {/* Preset List grid */}
-                <div className="flex flex-col gap-2">
-                  <span className="text-xs font-bold text-slate-500">標準プリセット素材</span>
-                  <div className="grid grid-cols-4 gap-2 max-h-[180px] overflow-y-auto pr-1">
-                    {assets.map((a, i) => (
-                      <div 
-                        key={i}
-                        onClick={() => {
-                          setActiveAsset(i);
-                          setTempAssetStore(i);
-                          setSelIdx(-1);
-                          lockedIdRef.current = null;
-                          setMode("move");
-                          setShowAssetOverlay(false);
-                        }}
-                        className={`p-2 rounded-2xl border flex flex-col items-center gap-1.5 transition-all text-center cursor-pointer ${activeAsset === i ? "border-blue-600 bg-blue-50/50 shadow shadow-blue-500/10" : "border-slate-200/6; hover:bg-slate-50"}`}
-                      >
-                        <div className="w-10 h-10 flex items-center justify-center bg-slate-55/80 rounded-xl overflow-hidden p-1">
-                          <img src={a.src} className="max-w-full max-h-full object-contain pointer-events-none" referrerPolicy="no-referrer" />
-                        </div>
-                        <span className="text-[10px] font-bold text-slate-600 truncate w-full">
-                          {a.name || `素材 ${i+1}`}
-                        </span>
-                        <div className="text-[8px] px-1 bg-slate-100 text-slate-400 font-mono font-bold rounded">
-                          {a.gw}x{a.gh}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="h-px bg-slate-100" />
-
-                {/* Upload Section custom images */}
-                <div className="flex flex-col gap-2.5">
-                  <span className="text-xs font-bold text-slate-500">外部または独自の画像を追加</span>
-                  <div className="flex gap-2">
+                <div className="flex-1 flex flex-col gap-1 justify-start overflow-hidden">
+                  <div className="flex gap-1 w-full">
                     <button 
-                      onClick={() => {
-                        const url = prompt("画像のURLを入力してください\n(※CORS制約がある場合表示されないことがあります)");
-                        if (!url || url.trim() === "") return;
-                        const img = new Image();
-                        img.crossOrigin = "anonymous";
-                        img.onload = () => {
-                          const src = cropImage(img);
-                          const i2 = new Image();
-                          i2.onload = () => {
-                            setAssets(prev => [
-                              ...prev,
-                              {
-                                img: i2,
-                                src,
-                                name: null,
-                                defS: 1,
-                                defO: 0,
-                                gw: 1,
-                                gh: 1,
-                                ox: 0,
-                                oy: 0
-                              }
-                            ]);
-                            setTimeout(() => {
-                              setActiveAsset(assets.length);
-                              setTempAssetStore(assets.length);
-                              setSelIdx(-1);
-                              lockedIdRef.current = null;
-                              setMode("move");
-                              setShowAssetOverlay(false);
-                            }, 150);
-                          };
-                          i2.src = src;
-                        };
-                        img.src = url.trim();
-                      }}
-                      className="flex-1 py-3 border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-2xl flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                      onClick={(e) => handleGuideClick('画像保存', e) || exportImage()}
+                      className="flex-1 h-7 sm:h-8 bg-green-500 hover:bg-green-600 active:bg-green-700 font-bold text-white text-[9px] sm:text-[10px] rounded-md shadow-sm transition-colors cursor-pointer text-center truncate px-0.5"
                     >
-                      <Plus size={14} /> URLから登録する
+                      画像保存
+                    </button>
+                    <button 
+                      onClick={saveToCloud}
+                      className="flex-1 h-7 sm:h-8 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 font-bold text-white text-[9px] sm:text-[10px] rounded-md shadow-sm transition-colors cursor-pointer truncate px-0.5"
+                    >
+                      部屋保存
+                    </button>
+                    <button 
+                      onClick={(e) => handleGuideClick('座標登録', e) || toggleCoordSettingMode()}
+                      className={`flex-1 h-7 sm:h-8 font-bold text-[9px] sm:text-[10px] rounded-md shadow-sm transition-colors border truncate px-0.5 ${isCoordSettingMode ? "bg-amber-500 hover:bg-amber-600 text-white border-amber-500 animate-pulse" : "bg-white hover:bg-gray-50 text-amber-600 border-amber-300"}`}
+                    >
+                      座標登録
+                    </button>
+                  </div>
+
+                  <div 
+                    className="flex gap-0.5 sm:gap-1 items-center"
+                    onClick={(e) => handleGuideClick('モード切替', e)}
+                  >
+                    <button 
+                      onClick={toggleEditLock}
+                      className={`w-7 sm:w-9 h-7 sm:h-8 rounded-md border flex items-center justify-center font-bold transition-all shadow-sm shrink-0 cursor-pointer ${isEditLocked ? "bg-amber-500 text-white border-amber-500" : "bg-white border-amber-500 text-amber-500 hover:bg-[#ff9500]/5"}`}
+                      title="編集ロック/閲覧モード"
+                    >
+                      {isEditLocked ? <Lock size={12} /> : <Unlock size={12} />}
                     </button>
 
-                    <label className="flex-1 py-3 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100/70 text-indigo-700 text-xs font-bold rounded-2xl flex items-center justify-center gap-1 transition-colors cursor-pointer">
-                      <Upload size={14} /> ファイルから読み込む
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        multiple 
-                        className="hidden" 
-                        onChange={(e) => handleFiles(e.target.files)} 
-                      />
-                    </label>
+                    <button 
+                      onClick={() => !isEditLocked && setMode("move")}
+                      disabled={isEditLocked}
+                      className={`flex-1 h-7 sm:h-8 font-bold text-[9px] sm:text-[10px] rounded-md border flex items-center justify-center gap-0.5 transition-all ${mode === "move" && !isEditLocked ? "bg-[#007aff] text-white border-[#007aff]" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400"}`}
+                    >
+                      <Move size={11} /> <span className="hidden xs:inline">移動</span><span className="inline xs:hidden">移</span>
+                    </button>
+
+                    <button 
+                      onClick={() => !isEditLocked && setMode("pen")}
+                      disabled={isEditLocked}
+                      className={`flex-1 h-7 sm:h-8 font-bold text-[9px] sm:text-[10px] rounded-md border flex items-center justify-center gap-0.5 transition-all ${mode === "pen" && !isEditLocked ? "bg-[#007aff] text-white border-[#007aff]" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400"}`}
+                    >
+                      <PenTool size={11} /> <span className="hidden xs:inline">ペン</span><span className="inline xs:hidden">筆</span>
+                    </button>
+
+                    <button 
+                      onClick={() => !isEditLocked && setMode("p-erase")}
+                      disabled={isEditLocked}
+                      className={`flex-1 h-7 sm:h-8 font-bold text-[9px] sm:text-[10px] rounded-md border flex items-center justify-center gap-0.5 transition-all ${mode === "p-erase" && !isEditLocked ? "bg-[#007aff] text-white border-[#007aff]" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400"}`}
+                    >
+                      線消
+                    </button>
+
+                    <button 
+                      onClick={() => !isEditLocked && setMode("erase")}
+                      disabled={isEditLocked}
+                      className={`flex-1 h-7 sm:h-8 font-bold text-[9px] sm:text-[10px] rounded-md border flex items-center justify-center gap-0.5 transition-all ${mode === "erase" && !isEditLocked ? "bg-[#007aff] text-white border-[#007aff]" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400"}`}
+                    >
+                      <Eraser size={11} /> <span className="hidden xs:inline">建物消</span><span className="inline xs:hidden">消</span>
+                    </button>
+                  </div>
+
+                  {/* 最新の座標コピー用レイアウトスペース */}
+                  <div className="flex items-center justify-between gap-1 h-7 sm:h-8 bg-gray-50 border border-gray-300 rounded-md px-1.5 text-[9px] sm:text-[10px] text-gray-700 font-bold shadow-inner">
+                    {selectedGrid ? (
+                      <>
+                        <span className="truncate flex items-center gap-0.5">
+                          📍 {coordMapping.isValid ? (
+                            `X:${getGameCoords(selectedGrid.gx, selectedGrid.gy)?.x}  Y:${getGameCoords(selectedGrid.gx, selectedGrid.gy)?.y}`
+                          ) : (
+                            `GIdx:${Math.round(selectedGrid.gx)}:${Math.round(selectedGrid.gy)}`
+                          )}
+                        </span>
+                        {coordMapping.isValid && (
+                          <button
+                            onClick={() => handleCopyGridCoords(selectedGrid.gx, selectedGrid.gy)}
+                            className="h-5 px-1 bg-[#007aff] hover:bg-[#007aff]/90 text-white rounded font-bold flex items-center gap-0.5 active:scale-95 transition-all text-[8px] tracking-tight shrink-0 cursor-pointer whitespace-nowrap"
+                          >
+                            <Copy size={9} /> コピー
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-[8px] sm:text-[9px] text-gray-400 truncate w-full text-center font-normal">
+                        タップして座標表示
+                      </span>
+                    )}
                   </div>
                 </div>
-
               </div>
             </div>
-          )}
+          </div>
 
-          {/* MEMBER LIST OVERLAY */}
+          {/* 1. 配置メンバー一覧名簿モーダル */}
           {showMemOverlay && (
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-3xl w-full max-w-sm p-5 flex flex-col gap-4 shadow-2xl border border-white/20 animate-toast">
-                <div className="flex justify-between items-center">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">GUILD MEMBERS</span>
-                    <h3 className="text-lg font-black text-slate-800">配置メンバー名簿</h3>
-                  </div>
-                  <button 
-                    onClick={() => setShowMemOverlay(false)}
-                    className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
-                  >
-                    <X size={20} />
+            <div 
+              className="fixed inset-0 bg-black/70 z-[3000] flex items-center justify-center p-4"
+              onClick={() => setShowMemOverlay(false)}
+            >
+              <div 
+                className="w-full max-w-sm bg-[#f8f9fa] rounded-2xl p-5 flex flex-col gap-4 max-h-[80vh] shadow-2xl border border-gray-200"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex justify-between items-center border-b-2 border-[#007aff] pb-2">
+                  <h3 className="text-base font-bold text-gray-800 flex items-center gap-1.5">
+                    <Users size={18} className="text-[#007aff]" /> 配置済みメンバー一覧
+                  </h3>
+                  <button onClick={() => setShowMemOverlay(false)} className="text-gray-500 hover:text-gray-700 font-bold text-lg">
+                    ×
                   </button>
                 </div>
 
-                <div className="max-h-[250px] overflow-y-auto pr-1 flex flex-col gap-1.5">
-                  {map.some(item => item.mem) ? (
-                    map.map((item) => {
-                      if (!item.mem) return null;
-                      const a = assets[item.aIdx];
-                      return (
-                        <div 
-                          key={item.id}
-                          onClick={() => jumpToMember(item.id)}
-                          className="flex items-center justify-between p-2.5 bg-slate-50 hover:bg-slate-100 active:scale-[0.99] border border-slate-200/60 rounded-xl transition-all cursor-pointer"
-                        >
-                          <div className="flex items-center gap-2">
-                            {a && (
-                              <div className="w-6 h-6 rounded bg-slate-200/50 flex items-center justify-center overflow-hidden p-0.5">
-                                <img src={a.src} className="max-w-full max-h-full object-contain" referrerPolicy="no-referrer" />
-                              </div>
-                            )}
-                            <span className="text-xs font-extrabold text-slate-800">{item.mem}</span>
-                          </div>
-                          <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg font-mono">
-                            {coordMapping.isValid && getGameCoords(item.x + (a ? a.gw - 1 : 0), item.y + (a ? a.gh - 1 : 0)) ? (
-                              `${getGameCoords(item.x + (a ? a.gw - 1 : 0), item.y + (a ? a.gh - 1 : 0)).x}:${getGameCoords(item.x + (a ? a.gw - 1 : 0), item.y + (a ? a.gh - 1 : 0)).y}`
-                            ) : (
-                              `Grid: ${Math.round(item.x)},${Math.round(item.y)}`
-                            )}
-                          </span>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="text-center py-6 text-slate-400 text-xs font-semibold leading-relaxed">
-                      現在名前が登録された建物がありません。<br />
-                      建物を配置・ダブルタップして名前を指定してください。
+                <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-2 my-1">
+                  {map.filter(d => d.mem && d.mem.trim() !== "").length === 0 ? (
+                    <div className="text-center py-8 text-gray-400 text-sm font-medium">
+                      メンバーがまだ配置されていません
                     </div>
+                  ) : (
+                    map
+                      .filter(d => d.mem && d.mem.trim() !== "")
+                      .sort((a, b) => a.mem.localeCompare(b.mem, "ja"))
+                      .map((m) => (
+                        <div 
+                          key={m.id}
+                          className="p-3 bg-white border border-gray-100 hover:border-[#007aff] rounded-lg text-sm flex justify-between items-center transition-all shadow-sm hover:shadow"
+                        >
+                          <span className="font-semibold text-gray-800">{m.mem}</span>
+                          <button 
+                            onClick={() => jumpToMember(m.id)}
+                            className="text-[#007aff] font-bold text-xs cursor-pointer hover:underline px-2 py-1 bg-sky-50 rounded"
+                          >
+                            表示 ▶
+                          </button>
+                        </div>
+                      ))
                   )}
                 </div>
-
               </div>
             </div>
           )}
 
-          {/* EXPORT DIRECT IMAGE PREVIEW MODAL */}
+          {/* 2. アセット素材選択モーダル */}
+          {showAssetOverlay && (
+            <div 
+              className="fixed inset-0 bg-black/70 z-[3000] flex items-center justify-center p-4"
+              onClick={() => setShowAssetOverlay(false)}
+            >
+              <div 
+                className="w-full max-w-md bg-[#f8f9fa] rounded-2xl p-5 flex flex-col gap-4 max-h-[80vh] shadow-2xl border border-gray-200"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex justify-between items-center border-b-2 border-[#007aff] pb-2">
+                  <h3 className="text-base font-bold text-gray-800 flex items-center gap-1.5">
+                    📦 建物素材アセット
+                  </h3>
+                  <button onClick={() => setShowAssetOverlay(false)} className="text-gray-500 hover:text-gray-700 font-bold text-lg">
+                    ×
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto pr-1 grid grid-cols-4 gap-3 py-2">
+                  <label 
+                    className="aspect-square border-2 border-dashed border-gray-300 hover:border-[#007aff] bg-white rounded-xl flex flex-col justify-center items-center text-sm font-bold text-gray-400 hover:text-[#007aff] cursor-pointer transition-all hover:bg-indigo-50/20 shadow-sm"
+                  >
+                    <input 
+                      type="file" 
+                      hidden 
+                      accept="image/*" 
+                      multiple 
+                      onChange={(e) => handleFiles(e.target.files)} 
+                    />
+                    <Upload size={24} className="mb-1 text-gray-300" />
+                    <span className="text-[10px]">オリジナル</span>
+                  </label>
+
+                  {assets.map((a, idx) => (
+                    <div 
+                      key={idx}
+                      onClick={() => {
+                        if (isEditLocked) return;
+                        setActiveAsset(idx);
+                        setTempAssetStore(idx);
+                        setSelIdx(-1);
+                        lockedIdRef.current = null;
+                        setMode("move");
+                        setShowAssetOverlay(false);
+                      }}
+                      className={`aspect-square rounded-xl border bg-white bg-contain bg-no-repeat bg-center cursor-pointer transition-all hover:scale-105 shadow-sm relative ${activeAsset === idx ? "border-[#007aff] ring-2 ring-sky-300" : "border-gray-200 hover:border-[#007aff]"}`}
+                      style={{ backgroundImage: `url(${a.src})` }}
+                      title={a.name ? a.name : `カスタム素材 ${idx}`}
+                    >
+                      {a.name && (
+                        <span className="absolute bottom-1 right-1 bg-black/60 text-white rounded text-[8px] px-1 scale-90 origin-bottom-right">
+                          {a.name}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 3. エクスポート画像オーバーレイ */}
           {exportImageUrl && (
-            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-4">
-              <div className="bg-white rounded-3xl w-full max-w-lg p-5 flex flex-col gap-4 shadow-2xl border border-white/20 animate-toast">
-                <div className="flex justify-between items-center">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">EXPORTED CAPTURE</span>
-                    <h3 className="text-lg font-black text-slate-800">配置画像の出力・保存</h3>
-                  </div>
-                  <button 
-                    onClick={() => setExportImageUrl(null)}
-                    className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-
-                <p className="text-xs font-bold text-slate-500 leading-normal">
-                  以下の画像を長押し、または右クリックして端末にダウンロード/保存が可能です。
-                </p>
-
-                <div className="border border-slate-100 rounded-2xl overflow-hidden bg-white max-h-[300px] flex items-center justify-center shadow-inner">
-                  <img src={exportImageUrl} className="max-w-full max-h-full object-contain" />
-                </div>
-
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => setExportImageUrl(null)}
-                    className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-extrabold rounded-2xl transition-colors cursor-pointer"
-                  >
-                    閉じる
-                  </button>
-                  <a 
-                    href={exportImageUrl} 
-                    download={`guild-map-${Date.now()}.png`}
-                    className="flex-[1.5] py-3 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-2xl flex items-center justify-center gap-1 shadow-lg shadow-emerald-500/10 transition-colors"
-                  >
-                    ファイルを直接ダウンロード
-                  </a>
-                </div>
-
+            <div 
+              className="fixed inset-0 bg-black/85 z-[4000] flex flex-col items-center justify-center p-4 cursor-pointer gap-4"
+              onClick={() => setExportImageUrl(null)}
+            >
+              <div className="absolute top-4 right-4 text-white bg-slate-800 hover:bg-slate-700 py-1.5 px-3 rounded-full text-xs font-semibold shadow flex items-center gap-1">
+                画面クリックで閉じる <X size={14} />
+              </div>
+              <img 
+                src={exportImageUrl} 
+                alt="Export" 
+                className="max-w-[95%] max-h-[80vh] border-2 border-white rounded shadow-2xl object-contain"
+              />
+              <div className="text-white text-xs font-bold bg-black/70 px-4 py-2 rounded-lg text-center leading-normal">
+                画像を長押し、または右クリックして「画像を保存」してください。<br />
+                （全消去や赤線が重なっていない綺麗な配置図が出力されています）
               </div>
             </div>
           )}
 
-          {/* COORDINATES REGISTERING MODAL DIALOG */}
+          {/* 4. 座標登録設定モーダル */}
           {isCoordSettingMode && (
-            <div className="absolute top-4 right-4 bg-slate-900/95 backdrop-blur-md border border-slate-800 text-white p-4 rounded-3xl shadow-2xl w-[320px] max-w-[calc(100vw-32px)] z-40 flex flex-col gap-3">
-              <div className="flex flex-col gap-2">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-1.5 text-amber-500">
-                    <MapPin size={16} />
-                    <span className="text-sm font-black text-white">基準点の登録</span>
-                  </div>
+            <div 
+              className="fixed inset-x-0 top-[75px] bottom-[235px] z-[2000] bg-transparent pointer-events-none flex flex-col items-center justify-end p-4"
+            >
+              <div 
+                className="w-full max-w-sm bg-slate-900/98 border border-amber-600/50 backdrop-blur-md rounded-2xl p-4 shadow-2xl text-white flex flex-col gap-3 pointer-events-auto"
+              >
+                <div className="flex justify-between items-center border-b border-amber-500/30 pb-1.5">
+                  <h4 className="text-xs font-extrabold text-amber-400 flex items-center gap-1">
+                    📍 基準点(L字) 3か所の座標登録
+                  </h4>
                   <button 
                     onClick={() => setIsCoordSettingMode(false)}
-                    className="text-slate-400 hover:text-white transition-colors cursor-pointer"
+                    className="text-slate-400 hover:text-white"
                   >
                     <X size={16} />
                   </button>
                 </div>
 
-                <p className="text-[10px] text-slate-350 leading-normal">
+                <p className="text-[10px] text-slate-300 leading-normal">
                   オレンジ色の3マスセット(A, B, C)をドラッグして、ゲーム内の座標が分かっているマスに置いてください。
                   以下に各マスの「ゲーム内の本当の X:Y 座標」を入力してください。
                 </p>
@@ -1995,7 +1935,7 @@
                 <div className="flex gap-2 w-full mt-1.5">
                   <button 
                     onClick={() => setIsCoordSettingMode(false)}
-                    className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-xs font-semibold text-slate-200 shadow transition-colors cursor-pointer"
+                    className="flex-1 py-2 bg-slate-800 hover:bg-slate-755 border border-slate-700 rounded-lg text-xs font-semibold text-slate-255 shadow transition-colors cursor-pointer"
                   >
                     キャンセル
                   </button>
@@ -2014,6 +1954,7 @@
       );
     }
 
+    // Render App
     const container = document.getElementById('root');
     const root = ReactDOM.createRoot(container);
     root.render(<App />);
