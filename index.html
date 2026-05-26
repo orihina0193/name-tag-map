@@ -163,7 +163,7 @@
       const [isEditLocked, setIsEditLocked] = useState(false);
       const [mode, setMode] = useState("move");
       
-      // 基準座標マッピング
+      // 新しい「座標登録モード」
       const [isCoordSettingMode, setIsCoordSettingMode] = useState(false);
       const [coordMapping, setCoordMapping] = useState({
         refGx: 0,
@@ -177,14 +177,14 @@
         isValid: false
       });
       
-      // 座標基準点入力
+      // 座標基準点入力用のstate
       const [coordInput, setCoordInput] = useState({
         aX: "100", aY: "100",
         bX: "101", bY: "100",
         cX: "100", cY: "101"
       });
 
-      // 選択中のマス
+      // タップ/クリックされた現在のマス座標（X:Y コピー用等）
       const [selectedGrid, setSelectedGrid] = useState(null);
       const [copiedNotification, setCopiedNotification] = useState(null);
 
@@ -199,12 +199,12 @@
       const [clearClickCount, setClearClickCount] = useState(0);
       const [isBotPanelCollapsed, setIsBotPanelCollapsed] = useState(false);
 
-      // オーバーレイ
+      // オーバーレイ / モーダル
       const [showMemOverlay, setShowMemOverlay] = useState(false);
       const [showAssetOverlay, setShowAssetOverlay] = useState(false);
       const [exportImageUrl, setExportImageUrl] = useState(null);
 
-      // キャンバス
+      // キャンバス / カメラ Ref
       const canvasRef = useRef(null);
       const camRef = useRef({ x: 0, y: 0, z: 1 });
       const dragRef = useRef(false);
@@ -214,14 +214,17 @@
       const penCurrentRef = useRef(null);
       const lastTRef = useRef({ x: 0, y: 0 });
       const lastDistRef = useRef(0);
+
+      // 座標登録モードでのL字ドラッグ用
       const isDraggingCoordRef = useRef(false);
 
+      // コピー文字列
       const showToast = (msg) => {
         setCopiedNotification(msg);
         setTimeout(() => setCopiedNotification(null), 2500);
       };
 
-      // 画像の自動クロップ (透明な外枠余白を自動でトリムして綺麗に吸着)
+      // 画像のクロップ処理
       const cropImage = (img) => {
         const c = document.createElement("canvas");
         const t = c.getContext("2d");
@@ -254,20 +257,24 @@
         return c2.toDataURL();
       };
 
-      // 等角座標空間(gx, gy) から ゲーム内 X, Y 実座標に線形補完して逆算するロジック
+      // 座標変換用の計算機 (等角グリッド gx, gy からゲーム内 X, Y を算出)
       const getGameCoords = (gx, gy) => {
         if (!coordMapping.isValid) return null;
         const gX = Math.round(gx);
         const gY = Math.round(gy);
+        
+        // Aからの相対的な位置
         const dx = gX - coordMapping.refGx;
         const dy = gY - coordMapping.refGy;
 
+        // 定義された3点から線形補間 (アフィンマッパー)
         const X = coordMapping.x0 + dx * (coordMapping.x1 - coordMapping.x0) + dy * (coordMapping.x2 - coordMapping.x0);
         const Y = coordMapping.y0 + dx * (coordMapping.y1 - coordMapping.y0) + dy * (coordMapping.y2 - coordMapping.y0);
 
         return { x: Math.round(X), y: Math.round(Y) };
       };
 
+      // ガイド表示切り替え
       const toggleGuideMode = () => {
         setGuideMode(!guideMode);
         if (!guideMode) {
@@ -299,6 +306,7 @@
         return true;
       };
 
+      // 編集ロック
       const toggleEditLock = () => {
         if (isEditLocked) {
           if (!confirm("閲覧モードを解除しますか？")) return;
@@ -311,7 +319,7 @@
         }
       };
 
-      // デバイス初期ロード
+      // URLパラメータとデータの初回ロード
       useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const room = params.get("room");
@@ -319,6 +327,7 @@
           setCurrentRoomName(room);
         }
 
+        // 座標マッピングデータの初期化ロード
         const savedMapping = localStorage.getItem("coord_mapping_v1");
         if (savedMapping) {
           try {
@@ -330,13 +339,15 @@
               cX: parsed.x2.toString(), cY: parsed.y2.toString()
             });
           } catch (e) {
-            console.error("Failed to load layout mapping coords:", e);
+            console.error("Failed to load layout map coordinates:", e);
           }
         }
 
+        // プリセットアセットのロード＆クロップ
         loadPresetsAssets();
       }, []);
 
+      // クラウドまたはローカルからの読込
       useEffect(() => {
         if (currentRoomName) {
           loadFromCloud(currentRoomName);
@@ -354,6 +365,7 @@
         }
       };
 
+      // プリセットロード
       const loadPresetsAssets = async () => {
         const loadedAssets = [];
         const hasBackend = window.location.hostname.endsWith("run.app") || window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
@@ -383,6 +395,7 @@
             };
 
             img.onerror = () => {
+              // Direct github fallback
               const directImg = new Image();
               directImg.crossOrigin = "anonymous";
               directImg.onload = () => {
@@ -406,6 +419,7 @@
               };
 
               directImg.onerror = () => {
+                // Local fallback (in same directory)
                 const localImg = new Image();
                 localImg.onload = () => {
                   const src = cropImage(localImg);
@@ -445,6 +459,7 @@
         setAssets(loadedAssets);
       };
 
+      // クラウド読込
       const loadFromCloud = (roomName) => {
         showStatus("サーバーから読込中...", "#ff9500", 0);
         fetch(`${API_ENDPOINT}?room=${encodeURIComponent(roomName)}`)
@@ -467,6 +482,7 @@
           });
       };
 
+      // クラウド保存
       const saveToCloud = () => {
         let room = currentRoomName;
         if (!room) {
@@ -503,11 +519,13 @@
           });
       };
 
+      // ローカル保存
       const saveLocalData = (roomName) => {
         const key = roomName ? `map_${roomName}` : "map_v293";
         localStorage.setItem(key, JSON.stringify({ m: map, l: lines }));
       };
 
+      // ローカル読込
       const loadLocalData = () => {
         const key = currentRoomName ? `map_${currentRoomName}` : "map_v293";
         const s = localStorage.getItem(key);
@@ -522,6 +540,7 @@
         }
       };
 
+      // 新オリジナル画像追加
       const handleFiles = (files) => {
         if (isEditLocked || !files) return;
         for (let i = 0; i < files.length; i++) {
@@ -549,6 +568,7 @@
                       oy: 0
                     }
                   ];
+                  // 新素材を追加したら即それにする
                   setTimeout(() => {
                     setActiveAsset(next.length - 1);
                     setTempAssetStore(next.length - 1);
@@ -568,6 +588,7 @@
         }
       };
 
+      // 基準座標マッピング保存
       const handleRegisterMapping = () => {
         const x0Val = parseFloat(coordInput.aX);
         const y0Val = parseFloat(coordInput.aY);
@@ -599,6 +620,7 @@
         showToast("基準座標を登録し、等角マップ全体の自動計算を有効化しました！");
       };
 
+      // 選択解除
       const deselect = () => {
         setActiveAsset(-1);
         setTempAssetStore(-1);
@@ -607,6 +629,7 @@
         setSelectedGrid(null);
       };
 
+      // カメラを対象建物へ
       const jumpToMember = (id) => {
         const d = map.find((item) => item.id === id);
         if (!d || !canvasRef.current) return;
@@ -625,6 +648,7 @@
         setShowMemOverlay(false);
       };
 
+      // メンバー名更新
       const updateMemberName = (val) => {
         if (isEditLocked) return;
         if (selIdx !== -1) {
@@ -637,6 +661,7 @@
         }
       };
 
+      // スライド操作反映
       const updateItemScale = (scale) => {
         if (isEditLocked || selIdx === -1) return;
         setMap((prev) => {
@@ -685,6 +710,7 @@
         saveLocalData();
       };
 
+      // マップ全初期化
       const handleClearAll = () => {
         if (isEditLocked) return;
         if (clearClickCount === 0) {
@@ -701,6 +727,7 @@
         }
       };
 
+      // コピー動作
       const handleCopyGridCoords = (gx, gy) => {
         const coords = getGameCoords(gx, gy);
         if (!coords) {
@@ -714,6 +741,7 @@
           })
           .catch((err) => {
             console.error("Clipboard copy error:", err);
+            // fallback inside iframe
             const el = document.createElement('textarea');
             el.value = txt;
             document.body.appendChild(el);
@@ -724,6 +752,7 @@
           });
       };
 
+      // クォータービュー座標・画面座標変換公式
       const toS = (gx, gy) => ({
         x: (gx - gy) * (T_W / 2),
         y: (gx + gy) * (T_H / 2)
@@ -739,6 +768,7 @@
         };
       };
 
+      // 重複判定
       const isBlocked = (gx, gy, gw, gh, ignoreId = null) => {
         for (let x = gx; x < gx + gw; x++) {
           for (let y = gy; y < gy + gh; y++) {
@@ -750,30 +780,52 @@
         return false;
       };
 
+      // Canvasリサイズ
       useEffect(() => {
-        const handleResize = () => {
-          const cvs = canvasRef.current;
-          if (!cvs) return;
-          const nw = cvs.parentElement?.clientWidth || window.innerWidth;
-          const nh = cvs.parentElement?.clientHeight || window.innerHeight;
-          
-          if (cvs.width > 0) {
-            camRef.current.x += (nw - cvs.width) / 2;
-            camRef.current.y += (nh - cvs.height) / 2;
-          } else {
-            camRef.current.x = nw / 2;
-            camRef.current.y = nh / 3;
-          }
-          cvs.width = nw;
-          cvs.height = nh;
-          drawMap();
-        };
+        const cvs = canvasRef.current;
+        if (!cvs) return;
+        const parent = cvs.parentElement;
+        if (!parent) return;
 
-        window.addEventListener("resize", handleResize);
-        handleResize();
-        return () => window.removeEventListener("resize", handleResize);
+        const resizeObserver = new ResizeObserver((entries) => {
+          for (const entry of entries) {
+            const { width: nw, height: nh } = entry.contentRect;
+            
+            if (nw > 0 && nh > 0) {
+              if (cvs.width !== nw || cvs.height !== nh) {
+                if (cvs.width > 0) {
+                  camRef.current.x += (nw - cvs.width) / 2;
+                  camRef.current.y += (nh - cvs.height) / 2;
+                } else {
+                  camRef.current.x = nw / 2;
+                  camRef.current.y = nh / 3;
+                }
+                cvs.width = nw;
+                cvs.height = nh;
+                drawMap();
+              }
+            }
+          }
+        });
+
+        resizeObserver.observe(parent);
+
+        // 初回初期サイズ設定
+        const iw = parent.clientWidth;
+        const ih = parent.clientHeight;
+        if (iw > 0 && ih > 0) {
+          cvs.width = iw;
+          cvs.height = ih;
+          camRef.current.x = iw / 2;
+          camRef.current.y = ih / 3;
+        }
+
+        return () => {
+          resizeObserver.disconnect();
+        };
       }, [assets]);
 
+      // 描画
       const drawMap = () => {
         const cvs = canvasRef.current;
         if (!cvs) return;
@@ -785,6 +837,7 @@
         ctx.translate(camRef.current.x, camRef.current.y);
         ctx.scale(camRef.current.z, camRef.current.z);
 
+        // 1. グリッドの描画
         ctx.strokeStyle = "rgba(0,0,0,0.08)";
         ctx.lineWidth = 1 / camRef.current.z;
         for (let i = -20; i <= 40; i++) {
@@ -803,6 +856,7 @@
           ctx.stroke();
         }
 
+        // 2. 特殊領地の描画
         map.forEach((d) => {
           const a = assets[d.aIdx];
           if (!a) return;
@@ -813,6 +867,7 @@
           }
         });
 
+        // 3. ルート線 (赤) の描画
         lines.forEach((l) => {
           ctx.beginPath();
           ctx.strokeStyle = "rgba(255,0,0,0.6)";
@@ -824,6 +879,7 @@
           ctx.stroke();
         });
 
+        // 4. 配置済み建物のソート・描画
         const sorted = [...map].sort(
           (a, b) => (Math.round(a.x) + Math.round(a.y)) - (Math.round(b.x) + Math.round(b.y))
         );
@@ -860,6 +916,7 @@
           }
         });
 
+        // 5. ギルメン名のバッジテキスト描画
         sorted.forEach((d) => {
           if (!d.mem) return;
           const a = assets[d.aIdx];
@@ -886,6 +943,7 @@
           ctx.restore();
         });
 
+        // 6. ペンルート可視化
         if (mode === "pen" && penStartRef.current && penCurrentRef.current) {
           ctx.beginPath();
           ctx.setLineDash([6 / camRef.current.z, 3 / camRef.current.z]);
@@ -899,6 +957,7 @@
           ctx.setLineDash([]);
         }
 
+        // 7. 選択中マスの強調
         if (selectedGrid) {
           const { gx, gy } = selectedGrid;
           ctx.strokeStyle = "#ff3b30";
@@ -923,6 +982,7 @@
           ctx.fill();
         }
 
+        // 8. 座標設定用の基準点(L字型に連なった3マス)の描画
         if (isCoordSettingMode) {
           const rx = coordMapping.refGx;
           const ry = coordMapping.refGy;
@@ -1006,6 +1066,7 @@
         ctx.stroke();
       };
 
+      // 依存更新
       useEffect(() => {
         drawMap();
       }, [map, lines, selIdx, activeAsset, selectedGrid, coordMapping, isCoordSettingMode, assets]);
@@ -1019,6 +1080,7 @@
         drawMap();
       };
 
+      // 操作
       const handleStart = (clientX, clientY) => {
         if (guideMode) return;
         const rect = canvasRef.current?.getBoundingClientRect();
@@ -1120,395 +1182,557 @@
 
           if (activeAsset !== -1) {
             const a = assets[activeAsset];
-            if (a) {
-              const nx = gx_o - (a.gw - 1);
-              const ny = gy_o - (a.gh - 1);
-              if (!isBlocked(nx, ny, a.gw, a.gh)) {
-                const prev = [...map].reverse().find((d) => d.aIdx === activeAsset);
-                const newItem = {
-                  id: Date.now() + Math.random(),
-                  x: nx,
-                  y: ny,
-                  aIdx: activeAsset,
-                  s: prev ? prev.s : a.defS,
-                  off: prev ? prev.off : a.defO,
-                  ox: prev ? prev.ox : a.ox,
-                  oy: prev ? prev.oy : a.oy,
-                  mem: ""
-                };
-                setMap((prev) => [...prev, newItem]);
-                setTimeout(() => {
-                  setMap(currentMap => {
-                    const idx = currentMap.findIndex(item => item.id === newItem.id);
-                    setSelIdx(idx);
-                    return currentMap;
-                  });
-                  lockedIdRef.current = newItem.id;
-                  setSelectedGrid({ gx: nx + a.gw - 1, gy: ny + a.gh - 1 });
-                }, 50);
-                saveLocalData();
-                drawMap();
-                return;
-              }
+            if (!a) return;
+            if (isBlocked(gx_o, gy_o, a.gw, a.gh)) {
+              showToast("他の建物と重複するスペースには配置できません");
+              return;
             }
+            const newItem = {
+              id: Date.now() + "_" + Math.random().toString(36).substr(2, 9),
+              aIdx: activeAsset,
+              x: gx_o,
+              y: gy_o,
+              s: a.defS,
+              off: a.defO,
+              mem: "",
+              ox: a.ox,
+              oy: a.oy
+            };
+            setMap((prev) => [...prev, newItem]);
+            setSelIdx(map.length);
+            lockedIdRef.current = newItem.id;
+            setSelectedGrid({ gx: gx_o + a.gw - 1, gy: gy_o + a.gh - 1 });
+            saveLocalData();
+            drawMap();
+            return;
           }
 
           setSelIdx(-1);
           lockedIdRef.current = null;
-          dragRef.current = true;
           setSelectedGrid({ gx: gx_o, gy: gy_o });
+          dragRef.current = true;
           drawMap();
         }
       };
 
-      const handleMove = (clientX, clientY, dx, dy) => {
-        const rawG = toG(clientX, clientY);
-
+      const handleMove = (clientX, clientY) => {
         if (isCoordSettingMode && isDraggingCoordRef.current) {
-          const gx = Math.floor(rawG.x);
-          const gy = Math.floor(rawG.y);
-          setCoordMapping((prev) => ({
-            ...prev,
-            refGx: gx,
-            refGy: gy
-          }));
-          drawMap();
+          const rawG = toG(clientX, clientY);
+          const gx_o = Math.floor(rawG.x);
+          const gy_o = Math.floor(rawG.y);
+          setCoordMapping(prev => ({ ...prev, refGx: gx_o, refGy: gy_o }));
           return;
         }
+
+        if (isEditLocked) {
+          if (dragRef.current) {
+            camRef.current.x += clientX - lastTRef.current.x;
+            camRef.current.y += clientY - lastTRef.current.y;
+            drawMap();
+          }
+          lastTRef.current = { x: clientX, y: clientY };
+          return;
+        }
+
+        const rawG = toG(clientX, clientY);
+        const gx_o = Math.floor(rawG.x);
+        const gy_o = Math.floor(rawG.y);
+        const gx_p = Math.round(rawG.x);
+        const gy_p = Math.round(rawG.y);
 
         if (mode === "pen" && penStartRef.current) {
-          penCurrentRef.current = { x: Math.round(rawG.x), y: Math.round(rawG.y) };
+          penCurrentRef.current = { x: gx_p, y: gy_p };
           drawMap();
           return;
         }
 
-        if (lockedIdRef.current !== null) {
-          const dIdx = map.findIndex((d) => d.id === lockedIdRef.current);
-          if (dIdx !== -1) {
-            const d = map[dIdx];
-            const a = assets[d.aIdx];
+        if (dragRef.current) {
+          camRef.current.x += clientX - lastTRef.current.x;
+          camRef.current.y += clientY - lastTRef.current.y;
+          drawMap();
+        } else if (selIdx !== -1 && mode === "move" && lockedIdRef.current) {
+          const itemIdx = map.findIndex((item) => item.id === lockedIdRef.current);
+          if (itemIdx !== -1) {
+            const a = assets[map[itemIdx].aIdx];
             if (a) {
-              const nx = Math.floor(rawG.x) - (a.gw - 1);
-              const ny = Math.floor(rawG.y) - (a.gh - 1);
-              if (!isBlocked(nx, ny, a.gw, a.gh, d.id)) {
-                setMap((prev) => {
-                  const next = [...prev];
-                  next[dIdx] = { ...next[dIdx], x: nx, y: ny };
-                  return next;
-                });
-                setSelIdx(dIdx);
-                setSelectedGrid({ gx: nx + a.gw - 1, gy: ny + a.gh - 1 });
-                saveLocalData();
+              const prevX = map[itemIdx].x;
+              const prevY = map[itemIdx].y;
+              if (prevX !== gx_o || prevY !== gy_o) {
+                if (!isBlocked(gx_o, gy_o, a.gw, a.gh, lockedIdRef.current)) {
+                  setMap((prev) => {
+                    const next = [...prev];
+                    next[itemIdx] = { ...next[itemIdx], x: gx_o, y: gy_o };
+                    return next;
+                  });
+                  setSelectedGrid({ gx: gx_o + a.gw - 1, gy: gy_o + a.gh - 1 });
+                  saveLocalData();
+                }
               }
             }
           }
-        } else if (dragRef.current) {
-          camRef.current.x += dx;
-          camRef.current.y += dy;
         }
-        drawMap();
+        lastTRef.current = { x: clientX, y: clientY };
       };
 
       const handleEnd = () => {
+        if (isCoordSettingMode) {
+          isDraggingCoordRef.current = false;
+          return;
+        }
+
         if (mode === "pen" && penStartRef.current && penCurrentRef.current) {
-          const ps = penStartRef.current;
-          const pc = penCurrentRef.current;
-          if (ps.x !== pc.x || ps.y !== pc.y) {
-            setLines((prev) => [...prev, { x1: ps.x, y1: ps.y, x2: pc.x, y2: pc.y }]);
+          const s = penStartRef.current;
+          const e = penCurrentRef.current;
+          if (s.x !== e.x || s.y !== e.y) {
+            setLines((prev) => [...prev, { x1: s.x, y1: s.y, x2: e.x, y2: e.y }]);
             saveLocalData();
           }
         }
         dragRef.current = false;
-        pinchRef.current = false;
-        lockedIdRef.current = null;
-        isDraggingCoordRef.current = false;
         penStartRef.current = null;
         penCurrentRef.current = null;
         drawMap();
       };
 
-      const exportImage = () => {
-        deselect();
-        drawMap();
-        const cvs = canvasRef.current;
-        if (!cvs) return;
+      // マウスイベント
+      const onMouseDown = (e) => {
+        if (e.button !== 0) return;
+        lastTRef.current = { x: e.clientX, y: e.clientY };
+        handleStart(e.clientX, e.clientY);
+      };
 
+      const onMouseMove = (e) => {
+        handleMove(e.clientX, e.clientY);
+      };
+
+      const onMouseUp = () => {
+        handleEnd();
+      };
+
+      // タッチイベント (マルチタッチピンチズーム対応)
+      const onTouchStart = (e) => {
+        const t = e.touches;
+        if (t.length === 1) {
+          lastTRef.current = { x: t[0].clientX, y: t[0].clientY };
+          handleStart(t[0].clientX, t[0].clientY);
+        } else if (t.length === 2) {
+          pinchRef.current = true;
+          dragRef.current = false;
+          penStartRef.current = null;
+          penCurrentRef.current = null;
+          const dx = t[0].clientX - t[1].clientX;
+          const dy = t[0].clientY - t[1].clientY;
+          lastDistRef.current = Math.hypot(dx, dy);
+          lastTRef.current = {
+            x: (t[0].clientX + t[1].clientX) / 2,
+            y: (t[0].clientY + t[1].clientY) / 2
+          };
+        }
+      };
+
+      const onTouchMove = (e) => {
+        const t = e.touches;
+        if (t.length === 1 && !pinchRef.current) {
+          handleMove(t[0].clientX, t[0].clientY);
+        } else if (t.length === 2 && pinchRef.current) {
+          const dx = t[0].clientX - t[1].clientX;
+          const dy = t[0].clientY - t[1].clientY;
+          const dist = Math.hypot(dx, dy);
+          const cx = (t[0].clientX + t[1].clientX) / 2;
+          const cy = (t[0].clientY + t[1].clientY) / 2;
+
+          const scaleChange = dist / lastDistRef.current;
+          zoom(scaleChange, cx, cy);
+
+          // カメラドラッグも並行処理
+          camRef.current.x += cx - lastTRef.current.x;
+          camRef.current.y += cy - lastTRef.current.y;
+
+          lastDistRef.current = dist;
+          lastTRef.current = { x: cx, y: cy };
+          drawMap();
+        }
+      };
+
+      const onTouchEnd = (e) => {
+        if (e.touches.length === 0) {
+          pinchRef.current = false;
+          handleEnd();
+        }
+      };
+
+      // ホイールズーム
+      const onWheel = (e) => {
+        e.preventDefault();
+        const rect = canvasRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        const cx = e.clientX - rect.left;
+        const cy = e.clientY - rect.top;
+        const scaleChange = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+        zoom(scaleChange, cx, cy);
+      };
+
+      // 編集用簡易座標登録モードのトグル
+      const toggleCoordSettingMode = () => {
+        if (isCoordSettingMode) {
+          setIsCoordSettingMode(false);
+        } else {
+          // 中央付近の等角座標を自動で拾って初期値に設定
+          if (canvasRef.current) {
+            const centerG = toG(canvasRef.current.width / 2, canvasRef.current.height / 2);
+            const rx = Math.floor(centerG.x);
+            const ry = Math.floor(centerG.y);
+            setCoordMapping(prev => ({
+              ...prev,
+              refGx: rx,
+              refGy: ry
+            }));
+          }
+          setIsCoordSettingMode(true);
+          setSelectedGrid(null);
+          setSelIdx(-1);
+          lockedIdRef.current = null;
+          setActiveAsset(-1);
+          showToast("座標登録モード: L字型の3つのマスの中心(A)を基準のマスに重ねてください");
+        }
+      };
+
+      // ギルド配置図をクリアな高精細1枚画像としてエクスポート
+      const exportImage = () => {
+        const rawSorted = [...map].sort(
+          (a, b) => (Math.round(a.x) + Math.round(a.y)) - (Math.round(b.x) + Math.round(b.y))
+        );
+        if (rawSorted.length === 0) {
+          alert("まだ誰もマップに建物を置いていません。");
+          return;
+        }
+
+        // ギルド領地の境界限界値サイズを自動計算
+        let minGx = Infinity, maxGx = -Infinity, minGy = Infinity, maxGy = -Infinity;
+        rawSorted.forEach(d => {
+          const a = assets[d.aIdx];
+          const gw = a ? a.gw : 1;
+          const gh = a ? a.gh : 1;
+          minGx = Math.min(minGx, Math.round(d.x));
+          maxGx = Math.max(maxGx, Math.round(d.x) + gw);
+          minGy = Math.min(minGy, Math.round(d.y));
+          maxGy = Math.max(maxGy, Math.round(d.y) + gh);
+        });
+
+        // 描画が収まるように余白スペース(グリッドサイズ)を拡充
+        const pad = 4;
+        minGx -= pad; maxGx += pad;
+        minGy -= pad; maxGy += pad;
+
+        const cropW = (maxGx - minGx) * T_W;
+        const cropH = (maxGy - minGy) * T_H;
+
+        // エクスポート用のダミーオフスクリーンCanvas作成
         const tempCvs = document.createElement("canvas");
+        tempCvs.width = Math.max(cropW, 1200);
+        tempCvs.height = Math.max(cropH, 800);
         const tempCtx = tempCvs.getContext("2d");
         if (!tempCtx) return;
 
-        tempCvs.width = cvs.width;
-        tempCvs.height = cvs.height;
+        // 背景を完全に綺麗な純白で統一
         tempCtx.fillStyle = "#ffffff";
         tempCtx.fillRect(0, 0, tempCvs.width, tempCvs.height);
-        tempCtx.drawImage(cvs, 0, 0);
 
-        setExportImageUrl(tempCvs.toDataURL("image/png"));
-      };
+        tempCtx.save();
+        // オブジェクトの並びがCanvasの中心になるようにカメラ位置調整
+        const centerS_X = (minGx - minGy) * (T_W / 2);
+        const centerS_Y = (minGx + minGy) * (T_H / 2);
+        tempCtx.translate(tempCvs.width / 2 - (centerS_X + cropW / 2), tempCvs.height / 2 - (centerS_Y + cropH / 2));
 
-      const toggleCoordSettingMode = () => {
-        setIsCoordSettingMode(!isCoordSettingMode);
-        if (!isCoordSettingMode) {
-          if (canvasRef.current) {
-            const centerG = toG(canvasRef.current.width / 2, canvasRef.current.height / 2);
-            setCoordMapping(prev => ({
-              ...prev,
-              refGx: Math.floor(centerG.x),
-              refGy: Math.floor(centerG.y)
-            }));
+        // 1. 等角薄グリッド描画
+        tempCtx.strokeStyle = "rgba(0,0,0,0.06)";
+        tempCtx.lineWidth = 1;
+        for (let i = minGx - 10; i <= maxGx + 10; i++) {
+          let s = toS(i, minGy - 10);
+          let e = toS(i, maxGy + 10);
+          tempCtx.beginPath();
+          tempCtx.moveTo(s.x, s.y);
+          tempCtx.lineTo(e.x, e.y);
+          tempCtx.stroke();
+
+          s = toS(minGx - 10, i);
+          e = toS(maxGx + 10, i);
+          tempCtx.beginPath();
+          tempCtx.moveTo(s.x, s.y);
+          tempCtx.lineTo(e.x, e.y);
+          tempCtx.stroke();
+        }
+
+        // 2. 特殊領地 (HQ / 国境関所など) 描画
+        rawSorted.forEach((d) => {
+          const a = assets[d.aIdx];
+          if (!a) return;
+          if (a.name === "OP") {
+            // 関所
+            tempCtx.fillStyle = "rgba(0, 122, 255, 0.1)";
+            tempCtx.beginPath();
+            const range = 5;
+            const gx = Math.round(d.x), gy = Math.round(d.y);
+            const p1 = toS(gx - range, gy - range);
+            const p2 = toS(gx + range + 1, gy - range);
+            const p3 = toS(gx + range + 1, gy + range + 1);
+            const p4 = toS(gx - range, gy + range + 1);
+            tempCtx.moveTo(p1.x, p1.y);
+            tempCtx.lineTo(p2.x, p2.y);
+            tempCtx.lineTo(p3.x, p3.y);
+            tempCtx.lineTo(p4.x, p4.y);
+            tempCtx.closePath();
+            tempCtx.fill();
+            tempCtx.strokeStyle = "rgba(0,122,255,0.25)";
+            tempCtx.stroke();
+          } else if (a.name === "DOOM") {
+            // 本部
+            tempCtx.fillStyle = "rgba(0, 122, 255, 0.1)";
+            tempCtx.beginPath();
+            const range = 6;
+            const gx = Math.round(d.x) + 1, gy = Math.round(d.y) + 1;
+            const p1 = toS(gx - range, gy - range);
+            const p2 = toS(gx + range + 1, gy - range);
+            const p3 = toS(gx + range + 1, gy + range + 1);
+            const p4 = toS(gx - range, gy + range + 1);
+            tempCtx.moveTo(p1.x, p1.y);
+            tempCtx.lineTo(p2.x, p2.y);
+            tempCtx.lineTo(p3.x, p3.y);
+            tempCtx.lineTo(p4.x, p4.y);
+            tempCtx.closePath();
+            tempCtx.fill();
+            tempCtx.strokeStyle = "rgba(0,122,255,0.25)";
+            tempCtx.stroke();
           }
-          setSelectedGrid(null);
+        });
+
+        // 3. 建物アセット描画
+        rawSorted.forEach((d) => {
+          const a = assets[d.aIdx];
+          if (!a) return;
+          const w = T_W * d.s;
+          const h = (a.img.height / a.img.width) * w;
+          const anchor = toS(d.x + a.gw + d.ox, d.y + a.gh + d.oy);
+
+          tempCtx.save();
+          tempCtx.drawImage(a.img, anchor.x - w / 2, anchor.y - h + d.off, w, h);
+          tempCtx.restore();
+        });
+
+        // 4. 配置ギルメンバッジ名描画
+        rawSorted.forEach((d) => {
+          if (!d.mem) return;
+          const a = assets[d.aIdx];
+          if (!a) return;
+          tempCtx.save();
+          const fVal = 9.5 * d.s;
+          const pVal = 3.2 * d.s;
+          const rVal = 2.2 * d.s;
+          tempCtx.font = `bold ${fVal}px sans-serif`;
+          const pos = toS(d.x + a.gw / 2, d.y + a.gh / 2);
+          const txtW = tempCtx.measureText(d.mem).width;
+          const bgW = txtW + pVal * 2;
+          const bgH = fVal + pVal;
+
+          tempCtx.fillStyle = "rgba(0,0,0,0.8)";
+          tempCtx.beginPath();
+          tempCtx.roundRect(pos.x - bgW / 2, pos.y - bgH / 2, bgW, bgH, rVal);
+          tempCtx.fill();
+
+          tempCtx.fillStyle = "#fff";
+          tempCtx.textAlign = "center";
+          tempCtx.textBaseline = "middle";
+          tempCtx.fillText(d.mem, pos.x, pos.y);
+          tempCtx.restore();
+        });
+
+        tempCtx.restore();
+
+        // 吐き出した画像URLをポインターオーバーレイ等に格納
+        try {
+          const url = tempCvs.toDataURL("image/png");
+          setExportImageUrl(url);
+        } catch (e) {
+          console.error("Export image creation failed (tainted canvas possibly):", e);
+          alert("画像の書き出し出力に失敗しました。画像ホストのCORSポリシー制限、またはオリジナル素材のセキュリティ制限が要因の可能性があります。");
         }
       };
 
       return (
-        <div className="fixed inset-0 select-none flex flex-col bg-[#e0e5ec] text-gray-800 font-sans touch-none overflow-hidden">
-          
-          <div className="flex-1 relative overflow-hidden" id="main-container">
-            <canvas 
-              ref={canvasRef} 
-              className="block bg-[#f0f0f0] w-full h-full cursor-crosshair"
-              onMouseDown={(e) => {
-                lastTRef.current = { x: e.clientX, y: e.clientY };
-                handleStart(e.clientX, e.clientY);
-              }}
-              onMouseMove={(e) => {
-                if (e.buttons === 1) {
-                  const dx = e.clientX - lastTRef.current.x;
-                  const dy = e.clientY - lastTRef.current.y;
-                  lastTRef.current = { x: e.clientX, y: e.clientY };
-                  handleMove(e.clientX, e.clientY, dx, dy);
-                }
-              }}
-              onMouseUp={handleEnd}
-              onMouseLeave={handleEnd}
-              
-              onTouchStart={(e) => {
-                if (e.touches.length === 1) {
-                  const t = e.touches[0];
-                  lastTRef.current = { x: t.clientX, y: t.clientY };
-                  handleStart(t.clientX, t.clientY);
-                } else if (e.touches.length === 2) {
-                  pinchRef.current = true;
-                  const dx = e.touches[0].clientX - e.touches[1].clientX;
-                  const dy = e.touches[0].clientY - e.touches[1].clientY;
-                  lastDistRef.current = Math.hypot(dx, dy);
-                }
-              }}
-              onTouchMove={(e) => {
-                if (e.touches.length === 1 && !pinchRef.current) {
-                  const t = e.touches[0];
-                  const dx = t.clientX - lastTRef.current.x;
-                  const dy = t.clientY - lastTRef.current.y;
-                  lastTRef.current = { x: t.clientX, y: t.clientY };
-                  handleMove(t.clientX, t.clientY, dx, dy);
-                } else if (e.touches.length === 2 && pinchRef.current) {
-                  const rect = canvasRef.current.getBoundingClientRect();
-                  const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
-                  const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
-                  
-                  const dx = e.touches[0].clientX - e.touches[1].clientX;
-                  const dy = e.touches[0].clientY - e.touches[1].clientY;
-                  const d = Math.hypot(dx, dy);
-                  if (lastDistRef.current > 0) {
-                    zoom(d / lastDistRef.current, cx, cy);
-                  }
-                  lastDistRef.current = d;
-                }
-              }}
-              onTouchEnd={(e) => {
-                if (e.touches.length === 0) {
-                  handleEnd();
-                }
-              }}
-              onWheel={(e) => {
-                const rect = canvasRef.current.getBoundingClientRect();
-                const scale = e.deltaY < 0 ? 1.08 : 0.92;
-                zoom(scale, e.clientX - rect.left, e.clientY - rect.top);
-              }}
-            />
+        <div id="app-container" className="fixed inset-0 flex flex-col items-center justify-start bg-slate-100 overflow-hidden font-sans select-none">
+          {/* コピペ用通知 */}
+          {copiedNotification && (
+            <div className="fixed top-5 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur-md text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xl z-[5000] tracking-wider border border-white/10 animate-toast">
+              <Check size={14} className="text-green-400" /> {copiedNotification}
+            </div>
+          )}
 
-            {/* 画面左上のバッジ情報 */}
-            <div id="room-badge" className="absolute top-[75px] left-[15px] bg-black/85 text-white py-1.5 px-3 rounded-full text-xs font-bold z-[500] pointer-events-none shadow-md">
-              部屋: {currentRoomName ? currentRoomName : "未指定 (ローカル)"}
+          {/* ヘッダーエリア */}
+          <header className="w-full h-[54px] bg-slate-900 text-white flex items-center justify-between px-3 sm:px-4 shrink-0 shadow-lg relative z-[1000] border-b border-white/5">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-md shadow-blue-500/20">
+                <Icon name="map-pin" size={18} className="text-white" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs sm:text-sm font-extrabold tracking-wider bg-gradient-to-r from-blue-300 to-indigo-100 bg-clip-text text-transparent">
+                  MAP LAYOUT EDITOR
+                </span>
+                <span className="text-[9px] text-slate-400 font-bold -mt-0.5 font-mono">
+                  ROOM: {currentRoomName ? `#${currentRoomName}` : "LOCAL_STANDALONE"}
+                </span>
+              </div>
             </div>
 
-            {/* 各種トースト・コピー完了通知 */}
-            {copiedNotification && (
-              <div 
-                className="absolute top-24 left-1/2 bg-slate-900 text-white py-2 px-5 rounded-lg text-sm font-semibold shadow-lg z-[2500] text-center border border-slate-700 -translate-x-1/2 animate-toast"
-              >
-                {copiedNotification}
+            {/* ガイドモード説明ラベル */}
+            {guideMode && (
+              <div className="absolute top-[62px] left-1/2 -translate-x-1/2 w-[90%] max-w-sm bg-blue-600 text-white p-3 rounded-xl text-xs font-bold shadow-2xl z-[4500] border border-blue-400/30 flex items-center gap-2 leading-relaxed animate-guide">
+                <HelpCircle size={16} className="shrink-0 text-blue-100" />
+                <span>{guideText}</span>
               </div>
             )}
 
-            {/* 同期ステータス */}
+            <div className="flex items-center gap-1.5">
+              <button 
+                onClick={toggleGuideMode}
+                className={`h-7 px-2.5 rounded-lg text-[10px] sm:text-xs font-bold flex items-center gap-1 shadow transition-all cursor-pointer ${guideMode ? "bg-amber-500 text-white hover:bg-amber-600 ring-2 ring-amber-300" : "bg-slate-800 text-slate-300 hover:bg-slate-700/80 hover:text-white"}`}
+              >
+                <HelpCircle size={14} /> ガイド
+              </button>
+              <button 
+                onClick={() => setShowMemOverlay(true)}
+                className="h-7 px-2.5 bg-slate-800 text-slate-300 hover:bg-slate-700/80 hover:text-white font-bold rounded-lg text-[10px] sm:text-xs flex items-center gap-1 shadow transition-all cursor-pointer"
+                onClickCapture={(e) => handleGuideClick('名簿', e)}
+              >
+                <Users size={14} /> 名簿 ({map.filter(d => d.mem && d.mem.trim() !== "").length})
+              </button>
+            </div>
+          </header>
+
+          {/* メイン ビューエリア */}
+          <div className="flex-1 w-full relative bg-slate-200">
+            <canvas 
+              ref={canvasRef} 
+              onMouseDown={onMouseDown}
+              onMouseMove={onMouseMove}
+              onMouseUp={onMouseUp}
+              onMouseLeave={onMouseUp}
+              onTouchStart={onTouchStart}
+              onTouchMove={onTouchMove}
+              onTouchEnd={onTouchEnd}
+              onWheel={onWheel}
+              className="absolute inset-0 w-full h-full block cursor-grab active:cursor-grabbing touch-none"
+            />
+
+            {/* サーバーステータスインジケータ */}
             {syncStatus && (
               <div 
-                id="sync-status" 
+                className="absolute top-3 left-3 px-2.5 py-1 rounded-full text-[9px] font-bold text-white shadow-md flex items-center gap-1.5 transition-all animate-toast z-[500]"
                 style={{ backgroundColor: syncStatus.color }}
-                className="absolute top-[75px] right-[65px] text-white py-1.5 px-3 rounded-full text-xs font-bold z-[500] shadow-md transition-all duration-300"
               >
+                <span className="w-1.5 h-1.5 bg-white rounded-full animate-ping" />
                 {syncStatus.text}
               </div>
             )}
 
-            {/* 右上のヘルプ・ガイドトリガー */}
-            <button 
-              id="guide-trigger" 
-              onClick={toggleGuideMode}
-              className={`absolute top-[75px] right-[15px] w-10 h-10 text-white rounded-full flex items-center justify-center font-bold text-xl z-[500] shadow-lg border-2 border-white cursor-pointer transition-colors ${guideMode ? "bg-[#ff3b30]" : "bg-[#007aff]/90"}`}
-            >
-              {guideMode ? "×" : "?"}
-            </button>
-
-            {/* ガイドメッセージ表示ボックス */}
-            {guideMode && (
-              <div 
-                id="guide-msg-box" 
-                className="absolute top-[125px] left-1/2 w-[85%] max-w-[400px] bg-black/90 text-white p-3.5 rounded-xl text-xs leading-relaxed z-[2500] text-center border border-white/20 shadow-xl -translate-x-1/2 animate-guide"
-              >
-                <div className="font-bold text-[#34c759] mb-1">💡 ガイドモード</div>
-                {guideText}
-              </div>
-            )}
-
-            {/* トップコントロールパネル */}
-            <div id="top-panel" className="absolute top-0 w-full h-[65px] bg-white/95 border-b border-gray-300 flex items-center px-1.5 sm:px-3.5 box-border z-[100] gap-1 sm:gap-2 shadow-sm">
-              <div 
-                id="cur-box" 
-                onClick={(e) => handleGuideClick('選択解除', e) || deselect()}
-                className={`w-10 h-10 sm:w-12 sm:h-12 border-2 border-[#007aff] rounded-lg bg-white bg-contain bg-no-repeat bg-center flex-shrink-0 cursor-pointer relative shadow-inner ${selIdx !== -1 || activeAsset !== -1 ? "after:content-['解除'] after:absolute after:bottom-[-2px] after:right-[-2px] after:bg-[#007aff] after:text-white after:text-[7px] sm:after:text-[8px] after:px-0.5 sm:after:px-1 after:rounded-md" : ""}`}
-                style={{ 
-                  backgroundImage: selIdx !== -1 && map[selIdx]?.aIdx !== undefined && assets[map[selIdx].aIdx]
-                    ? `url(${assets[map[selIdx].aIdx].src})` 
-                    : activeAsset !== -1 && assets[activeAsset] 
-                    ? `url(${assets[activeAsset].src})` 
-                    : "none" 
-                }}
-                title="選択解除"
-              />
-
-              <input 
-                type="text" 
-                id="member-name-in" 
-                placeholder={selIdx !== -1 ? "名前を入力" : "タップで名前指定"}
-                disabled={isEditLocked || selIdx === -1}
-                value={selIdx !== -1 && map[selIdx] ? map[selIdx].mem : ""}
-                onChange={(e) => updateMemberName(e.target.value)}
-                onClick={(e) => {
-                  if (guideMode) {
-                    handleGuideClick('ギルメン名', e);
-                    e.target.blur();
+            {/* 簡易スケール/カメラリセット UI */}
+            <div className="absolute right-3 top-3 flex flex-col gap-1 z-[500] pointer-events-none">
+              <button 
+                onClick={() => {
+                  if (canvasRef.current) {
+                    camRef.current.x = canvasRef.current.width / 2;
+                    camRef.current.y = canvasRef.current.height / 3;
+                    camRef.current.z = 1;
+                    drawMap();
                   }
                 }}
-                className="flex-1 h-10 sm:h-11 border border-gray-300 rounded-lg px-2 sm:px-3 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#007aff] bg-white disabled:bg-gray-100 disabled:text-gray-500 font-medium transition-all"
-              />
-
-              <button 
-                className="top-btn w-10 h-10 sm:w-11 sm:h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 flex items-center justify-center flex-shrink-0 cursor-pointer shadow-sm text-base sm:text-lg"
-                onClick={(e) => handleGuideClick('名簿', e) || setShowMemOverlay(true)}
-                title="名簿"
+                className="w-8 h-8 bg-white/90 hover:bg-white text-slate-800 hover:text-[#007aff] border border-gray-300/60 rounded-xl shadow-lg flex items-center justify-center active:scale-95 transition-all pointer-events-auto cursor-pointer"
+                title="表示位置を戻す"
               >
-                👥
+                <RotateCcw size={15} />
               </button>
               <button 
-                className="top-btn w-10 h-10 sm:w-11 sm:h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 flex items-center justify-center flex-shrink-0 cursor-pointer shadow-sm text-base sm:text-lg"
-                onClick={(e) => handleGuideClick('素材追加', e) || setShowAssetOverlay(true)}
-                title="素材追加"
+                onClick={() => deselect()}
+                className="w-8 h-8 bg-white/90 hover:bg-white text-slate-800 hover:text-amber-500 border border-gray-300/60 rounded-xl shadow-lg flex items-center justify-center active:scale-95 transition-all pointer-events-auto cursor-pointer"
+                title="選択をクリア"
+                onClickCapture={(e) => handleGuideClick('選択解除', e)}
               >
-                ＋
+                <Grid size={15} />
               </button>
               <button 
-                className={`top-clr-btn h-10 px-2 sm:px-3 rounded-lg text-white font-bold text-xs flex items-center justify-center flex-shrink-0 cursor-pointer border-none shadow-sm transition-colors ${clearClickCount === 1 ? "bg-amber-500 animate-pulse" : "bg-red-500 hover:bg-red-600"}`}
-                onClick={(e) => handleGuideClick('全消去', e) || handleClearAll()}
-                title="全消去"
+                onClick={handleClearAll}
+                className={`w-8 h-8 border rounded-xl shadow-lg flex items-center justify-center active:scale-95 transition-all pointer-events-auto cursor-pointer ${clearClickCount === 1 ? "bg-red-500 text-white border-red-500 animate-pulse" : "bg-white/90 border-gray-300/60 text-red-500 hover:bg-red-50"}`}
+                title="全要素を画面から消去"
+                onClickCapture={(e) => handleGuideClick('全消去', e)}
               >
-                {clearClickCount === 1 ? "確定" : "全消去"}
+                <Trash2 size={15} />
               </button>
             </div>
-
           </div>
 
-          {/* ボトムパネル (操作スライダー、開閉トレイ、下部隙間へのコピー座標スペースを融合) */}
-          <div 
-            id="bot-panel" 
-            className={`bg-white/98 border-t border-gray-300 px-3 pb-2 pt-0 box-border z-[100] flex flex-col gap-1.5 shrink-0 shadow-lg transition-all duration-300 ${isBotPanelCollapsed ? "h-[45px]" : "h-[228px] sm:h-[228px]"}`}
-          >
-            {/* 折りたたみトグル用のヘッダーバー */}
-            <div 
-              className="flex items-center justify-between py-1 px-3 -mx-3 border-b border-gray-200 bg-gray-50/90 hover:bg-gray-100 cursor-pointer active:bg-gray-200 transition-colors select-none"
-              onClick={(e) => {
-                if (e.target.closest(".prevent-collapse-toggle")) {
-                  return;
-                }
-                setIsBotPanelCollapsed(!isBotPanelCollapsed);
-              }}
+          {/* 下部編集/調整パネル */}
+          <div className="w-full bg-white border-t border-gray-300/80 shadow-[0_-8px_24px_rgba(0,0,0,0.06)] relative z-[1500] shrink-0 pb-safe">
+            {/* 折畳トグル */}
+            <button 
+              onClick={() => setIsBotPanelCollapsed(!isBotPanelCollapsed)}
+              className="absolute -top-[23px] left-1/2 -translate-x-1/2 px-4 h-6 bg-white border-t border-x border-gray-300/80 rounded-t-xl text-gray-500 hover:text-[#007aff] flex items-center justify-center shadow-[-4px_-4px_10px_rgba(0,0,0,0.03)] cursor-pointer select-none transition-colors active:bg-gray-50"
             >
-              <div className="flex items-center text-[11px] font-bold text-gray-600 gap-1">
-                {isBotPanelCollapsed ? (
-                  <>
-                    <ChevronUp size={14} className="text-[#007aff]" /> 
-                    <span className="text-[10px] sm:text-[11px]">調整パネルを開く</span>
-                  </>
-                ) : (
-                  <>
-                    <ChevronDown size={14} className="text-gray-400" />
-                    <span className="text-[10px] sm:text-[11px]">調整パネルを隠す</span>
-                  </>
-                )}
+              {isBotPanelCollapsed ? <ChevronUp size={14} className="animate-bounce" /> : <ChevronDown size={14} />}
+            </button>
+
+            <div className={`w-full max-w-lg mx-auto p-2 sm:p-3 pb-3 sm:pb-4 flex flex-col gap-2 transition-all duration-300 ${isBotPanelCollapsed ? "h-0 py-0 pb-0 overflow-hidden pointer-events-none opacity-0 border-t-0" : "h-auto opacity-100 pointer-events-auto"}`}>
+              {/* アセット呼び出し ＆ メンバー名追加エリア */}
+              <div className="flex gap-2 sm:gap-2.5 items-center w-full">
+                {/* 建物アセット呼び出しボタン */}
+                <button 
+                  onClick={() => setShowAssetOverlay(true)}
+                  className="h-9 sm:h-10 px-3 sm:px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:from-blue-800 active:to-indigo-800 text-white font-extrabold text-[10px] sm:text-xs tracking-wider rounded-xl shadow-md shadow-blue-500/10 flex items-center gap-1.5 shrink-0 transition-all cursor-pointer whitespace-nowrap"
+                  onClickCapture={(e) => handleGuideClick('素材追加', e)}
+                >
+                  🧱 建物選択
+                </button>
+
+                {/* ギルメン名・名前登録スロット */}
+                <div 
+                  className="flex-1 flex gap-1 items-center bg-gray-50 border border-gray-300 rounded-xl px-2 sm:px-3 h-9 sm:h-10 focus-within:ring-2 focus-within:ring-sky-500/20 focus-within:border-[#007aff] transition-colors"
+                  onClick={(e) => handleGuideClick('ギルメン名', e)}
+                >
+                  <span className="text-gray-400 text-xs sm:text-sm">👤</span>
+                  <input 
+                    type="text" 
+                    placeholder={isEditLocked ? "編集保護中 (閲覧のみ)" : selIdx === -1 ? "配置物をタップして名前入力" : "配置したギルメンの名前"}
+                    disabled={isEditLocked || selIdx === -1}
+                    value={selIdx !== -1 && map[selIdx] ? map[selIdx].mem : ""}
+                    onChange={(e) => updateMemberName(e.target.value)}
+                    className="w-full bg-transparent border-none text-xs sm:text-sm font-bold text-gray-800 focus:outline-none placeholder-gray-400"
+                  />
+                  {selIdx !== -1 && !isEditLocked && (
+                    <button 
+                      onClick={() => updateMemberName("")}
+                      className="text-gray-400 hover:text-gray-600 text-xs font-bold font-mono px-1 active:scale-95 transition-transform shrink-0"
+                    >
+                      CLEAR
+                    </button>
+                  )}
+                </div>
               </div>
 
-              {/* 選択マスの簡易表示(コピー機能) */}
-              <div className="flex-1 flex justify-end items-center gap-1.5 pl-3 prevent-collapse-toggle">
-                {selectedGrid ? (
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-700 bg-white border border-gray-200 py-0.5 px-2 rounded-full shadow-sm max-w-[200px] truncate">
-                    <span className="truncate">
-                      📍 {coordMapping.isValid ? (
-                        `X:${getGameCoords(selectedGrid.gx, selectedGrid.gy)?.x} Y:${getGameCoords(selectedGrid.gx, selectedGrid.gy)?.y}`
-                      ) : (
-                        `マス:${Math.round(selectedGrid.gx)}:${Math.round(selectedGrid.gy)}`
-                      )}
-                    </span>
-                    {coordMapping.isValid && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCopyGridCoords(selectedGrid.gx, selectedGrid.gy);
-                        }}
-                        className="py-0.5 px-1.5 bg-[#007aff] hover:bg-[#007aff]/90 text-white rounded text-[8px] font-bold flex items-center gap-0.5 whitespace-nowrap"
-                      >
-                        <Copy size={8} />
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <span className="text-[9px] text-gray-400 truncate">
-                    タップで座標表示
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* スライドで表示/非表示になる本体コンテンツ */}
-            <div className={`flex flex-col gap-1.5 overflow-hidden transition-opacity duration-200 ${isBotPanelCollapsed ? "opacity-0 pointer-events-none h-0" : "opacity-100 h-full"}`}>
-              {/* 建物サイズ調整スライダー */}
+              {/* サイズ＆重なり順(接地)微調整スライダー */}
               <div 
-                className="flex items-center gap-2 mt-0.5"
+                className="flex items-center gap-2 sm:gap-3 justify-between bg-zinc-50 border border-gray-300/70 rounded-xl px-2 sm:px-3 py-1.5 sm:py-2 select-none"
                 onClick={(e) => handleGuideClick('サイズ調整', e)}
               >
-                <label className="text-[11px] font-bold w-9 shrink-0 text-gray-500">サイズ</label>
+                <span className="text-[10px] sm:text-xs font-bold text-gray-500 shrink-0">サイズ</span>
                 <button 
                   disabled={isEditLocked || selIdx === -1}
                   onClick={() => adjScale(-0.05)}
-                  className="w-8 h-7 sm:w-9 sm:h-8 text-base sm:text-lg border border-gray-300 bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 rounded-md text-[#007aff] cursor-pointer shrink-0 font-bold active:bg-gray-200 transition-colors"
+                  className="w-8 h-7 sm:w-9 sm:h-8 text-base sm:text-lg border border-gray-300 bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 rounded-md text-[#007aff] cursor-pointer shrink-0 font-bold active:bg-gray-200 transition-colors pointer-events-auto"
                 >
                   -
                 </button>
                 <input 
                   type="range" 
                   min="0.1" 
-                  max="5" 
+                  max="4" 
                   step="0.05"
                   disabled={isEditLocked || selIdx === -1}
                   value={selIdx !== -1 && map[selIdx] ? map[selIdx].s : 1}
@@ -1518,22 +1742,21 @@
                 <button 
                   disabled={isEditLocked || selIdx === -1}
                   onClick={() => adjScale(0.05)}
-                  className="w-8 h-7 sm:w-9 sm:h-8 text-base sm:text-lg border border-gray-300 bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 rounded-md text-[#007aff] cursor-pointer shrink-0 font-bold active:bg-gray-200 transition-colors"
+                  className="w-8 h-7 sm:w-9 sm:h-8 text-base sm:text-lg border border-gray-300 bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 rounded-md text-[#007aff] cursor-pointer shrink-0 font-bold active:bg-gray-200 transition-colors pointer-events-auto"
                 >
                   +
                 </button>
               </div>
 
-              {/* 前後重なり接地スライダー */}
               <div 
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 sm:gap-3 justify-between bg-zinc-50 border border-gray-300/70 rounded-xl px-2 sm:px-3 py-1.5 sm:py-2 select-none"
                 onClick={(e) => handleGuideClick('接地調整', e)}
               >
-                <label className="text-[11px] font-bold w-9 shrink-0 text-gray-500">接地</label>
+                <span className="text-[10px] sm:text-xs font-bold text-gray-500 shrink-0 w-8 sm:w-auto">接地/重ね</span>
                 <button 
                   disabled={isEditLocked || selIdx === -1}
                   onClick={() => adjOffset(-1)}
-                  className="w-8 h-7 sm:w-9 sm:h-8 text-base sm:text-lg border border-gray-300 bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 rounded-md text-[#007aff] cursor-pointer shrink-0 font-bold active:bg-gray-200 transition-colors"
+                  className="w-8 h-7 sm:w-9 sm:h-8 text-base sm:text-lg border border-gray-300 bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 rounded-md text-[#007aff] cursor-pointer shrink-0 font-bold active:bg-gray-200 transition-colors pointer-events-auto"
                 >
                   -
                 </button>
@@ -1550,14 +1773,15 @@
                 <button 
                   disabled={isEditLocked || selIdx === -1}
                   onClick={() => adjOffset(1)}
-                  className="w-8 h-7 sm:w-9 sm:h-8 text-base sm:text-lg border border-gray-300 bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 rounded-md text-[#007aff] cursor-pointer shrink-0 font-bold active:bg-gray-200 transition-colors"
+                  className="w-8 h-7 sm:w-9 sm:h-8 text-base sm:text-lg border border-gray-300 bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 rounded-md text-[#007aff] cursor-pointer shrink-0 font-bold active:bg-gray-200 transition-colors pointer-events-auto"
                 >
                   +
                 </button>
               </div>
 
-              {/* 移動・アンカー位置微調整の十字 */}
+              {/* 素材移動・調整とモードコントロール */}
               <div className="flex gap-2 sm:gap-2.5 w-full mt-0.5 sm:mt-1">
+                {/* 微調整用 3x3 グリッド十字 */}
                 <div 
                   id="nudge-grid" 
                   className="grid grid-cols-3 gap-0.5 w-[90px] sm:w-[120px] shrink-0"
@@ -1595,7 +1819,9 @@
                   </button>
                 </div>
 
+                {/* モード切り替えパネル */}
                 <div className="flex-1 flex flex-col gap-1 justify-start overflow-hidden">
+                  {/* 任意座標登録とセーブボタン */}
                   <div className="flex gap-1 w-full">
                     <button 
                       onClick={(e) => handleGuideClick('画像保存', e) || exportImage()}
@@ -1611,12 +1837,13 @@
                     </button>
                     <button 
                       onClick={(e) => handleGuideClick('座標登録', e) || toggleCoordSettingMode()}
-                      className={`flex-1 h-7 sm:h-8 font-bold text-[9px] sm:text-[10px] rounded-md shadow-sm transition-colors border truncate px-0.5 ${isCoordSettingMode ? "bg-amber-500 hover:bg-amber-600 text-white border-amber-500 animate-pulse" : "bg-white hover:bg-gray-50 text-amber-600 border-amber-300"}`}
+                      className={`flex-1 h-7 sm:h-8 font-bold text-[9px] sm:text-[10px] rounded-md shadow-sm transition-colors cursor-pointer border truncate px-0.5 ${isCoordSettingMode ? "bg-amber-500 hover:bg-amber-600 text-white border-amber-500 animate-pulse" : "bg-white hover:bg-gray-50 text-amber-600 border-amber-300"}`}
                     >
                       座標登録
                     </button>
                   </div>
 
+                  {/* 各種のドローイングツール、閲覧・移動ツール */}
                   <div 
                     className="flex gap-0.5 sm:gap-1 items-center"
                     onClick={(e) => handleGuideClick('モード切替', e)}
@@ -1662,7 +1889,7 @@
                     </button>
                   </div>
 
-                  {/* 最新の座標コピー用レイアウトスペース */}
+                  {/* 選択中のマスのゲーム内座標とコピーボタン */}
                   <div className="flex items-center justify-between gap-1 h-7 sm:h-8 bg-gray-50 border border-gray-300 rounded-md px-1.5 text-[9px] sm:text-[10px] text-gray-700 font-bold shadow-inner">
                     {selectedGrid ? (
                       <>
