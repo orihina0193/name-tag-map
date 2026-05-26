@@ -467,6 +467,18 @@
               const d = JSON.parse(LZString.decompressFromEncodedURIComponent(text));
               setMap(d.m || []);
               setLines(d.l || []);
+              if (d.c) {
+                setCoordMapping(d.c);
+                setCoordInput({
+                  aX: d.c.x0.toString(),
+                  aY: d.c.y0.toString(),
+                  bX: d.c.x1.toString(),
+                  bY: d.c.y1.toString(),
+                  cX: d.c.x2.toString(),
+                  cY: d.c.y2.toString()
+                });
+                localStorage.setItem("coord_mapping_v1", JSON.stringify(d.c));
+              }
               showStatus("同期完了", "#34c759");
             } else {
               showStatus("新規データです", "#007aff");
@@ -496,7 +508,7 @@
         lockedIdRef.current = null;
         showStatus("保存中...", "#ff9500", 0);
 
-        const rawStr = JSON.stringify({ m: map, l: lines });
+        const rawStr = JSON.stringify({ m: map, l: lines, c: coordMapping });
         const compressedStr = LZString.compressToEncodedURIComponent(rawStr);
 
         fetch(API_ENDPOINT, {
@@ -520,7 +532,7 @@
       // ローカル保存
       const saveLocalData = (roomName) => {
         const key = roomName ? `map_${roomName}` : "map_v293";
-        localStorage.setItem(key, JSON.stringify({ m: map, l: lines }));
+        localStorage.setItem(key, JSON.stringify({ m: map, l: lines, c: coordMapping }));
       };
 
       // ローカル読込
@@ -532,6 +544,18 @@
             const d = JSON.parse(s);
             setMap(d.m || []);
             setLines(d.l || []);
+            if (d.c) {
+              setCoordMapping(d.c);
+              setCoordInput({
+                aX: d.c.x0.toString(),
+                aY: d.c.y0.toString(),
+                bX: d.c.x1.toString(),
+                bY: d.c.y1.toString(),
+                cX: d.c.x2.toString(),
+                cY: d.c.y2.toString()
+              });
+              localStorage.setItem("coord_mapping_v1", JSON.stringify(d.c));
+            }
           } catch (e) {
             console.error("Local load error:", e);
           }
@@ -614,6 +638,11 @@
 
         setCoordMapping(newMapping);
         localStorage.setItem("coord_mapping_v1", JSON.stringify(newMapping));
+
+        // 現在のマップ、ラインと新マッピングで即時ローカル保存
+        const key = currentRoomName ? `map_${currentRoomName}` : "map_v293";
+        localStorage.setItem(key, JSON.stringify({ m: map, l: lines, c: newMapping }));
+
         setIsCoordSettingMode(false);
         showToast("基準座標を登録し、等角マップ全体の自動計算を有効化しました！");
       };
