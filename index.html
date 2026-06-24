@@ -30,6 +30,13 @@
   
   <!-- Babel compiler CDN (runs in browser) -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script>
+    Babel.registerPreset('classic-react', {
+      presets: [
+        [Babel.availablePresets['react'], { runtime: 'classic' }]
+      ]
+    });
+  </script>
   
   <!-- LZ-String compression CDN (decompress shared cloud strings) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
@@ -62,7 +69,7 @@
   <div id="root"></div>
 
   <!-- React App using Babel JSX compilation -->
-  <script type="text/babel">
+  <script type="text/babel" data-presets="classic-react">
     const { useState, useEffect, useRef } = React;
     
     // Custom wrapper for Lucide Icons in standalone browser HTML environment
@@ -160,7 +167,8 @@
       const [currentRoomName, setCurrentRoomName] = useState(null);
       const [guideMode, setGuideMode] = useState(false);
       const [guideText, setGuideText] = useState("ガイドモード：ボタンをタップして説明を表示");
-      const [isEditLocked, setIsEditLocked] = useState(false);
+      const [isEditLocked, setIsEditLocked] = useState(true);
+      const [roomPin, setRoomPin] = useState("");
       const [mode, setMode] = useState("move");
       
       // 新しい「座標登録モード」
@@ -198,6 +206,7 @@
       const [syncStatus, setSyncStatus] = useState(null);
       const [clearClickCount, setClearClickCount] = useState(0);
       const [isBotPanelCollapsed, setIsBotPanelCollapsed] = useState(false);
+      const [groupNames, setGroupNames] = useState(["グループA", "グループB", "グループC"]);
 
       // オーバーレイ / モーダル
       const [showMemOverlay, setShowMemOverlay] = useState(false);
@@ -309,11 +318,62 @@
 
       // 編集ロック
       const toggleEditLock = () => {
-        setIsEditLocked(!isEditLocked);
-        if (!isEditLocked) {
+        if (isEditLocked) {
+          // ロック解除時にPINが設定されていれば入力を求める
+          if (roomPin && roomPin.trim() !== "") {
+            const input = prompt("この部屋は編集ロックされています。\nPIN（暗証番号）を入力してください：");
+            if (input === null) return; // キャンセルされた場合
+            if (input !== roomPin) {
+              alert("PIN（暗証番号）が一致しません。");
+              return;
+            }
+          }
+          setIsEditLocked(false);
+        } else {
+          setIsEditLocked(true);
           setSelIdx(-1);
           lockedIdRef.current = null;
           setActiveAsset(-1);
+        }
+      };
+
+      // PINの登録・変更
+      const changePin = () => {
+        if (isEditLocked) return;
+        const newPin = prompt("部屋の編集ロック解除用PIN（暗証番号）を設定します。\n新しいPIN（暗証番号）を入力してください：\n（※何も入力せずにOKを押すと、PINロックは解除されて誰でも編集できるようになります）");
+        if (newPin === null) return; // キャンセル
+
+        const trimmed = newPin.trim();
+        setRoomPin(trimmed);
+        
+        showStatus("PIN変更を保存中...", "#ff9500", 0);
+        
+        // 暗黙的にローカルとクラウドを即時同期（設定し忘れ防止）
+        const rawStr = JSON.stringify({ m: map, l: lines, c: coordMapping, g: groupNames, p: trimmed });
+        const compressedStr = LZString.compressToEncodedURIComponent(rawStr);
+        
+        if (currentRoomName) {
+          fetch(API_ENDPOINT, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ room: currentRoomName, str: compressedStr })
+          })
+          .then(() => {
+            const key = `map_${currentRoomName}`;
+            localStorage.setItem(key, JSON.stringify({ m: map, l: lines, c: coordMapping, g: groupNames, p: trimmed }));
+            showStatus(trimmed ? "PINを設定しました！" : "PINロックを解除しました", "#34c759", 3000);
+          })
+          .catch((err) => {
+            console.error("Save PIN cloud error:", err);
+            const key = `map_${currentRoomName}`;
+            localStorage.setItem(key, JSON.stringify({ m: map, l: lines, c: coordMapping, g: groupNames, p: trimmed }));
+            showStatus("ローカルに保存しました", "#007aff", 3000);
+          });
+        } else {
+          const key = "map_v293";
+          localStorage.setItem(key, JSON.stringify({ m: map, l: lines, c: coordMapping, g: groupNames, p: trimmed }));
+          showStatus(trimmed ? "PINをローカルに設定しました" : "PINロックを解除しました", "#34c759", 3000);
         }
       };
 
@@ -377,15 +437,15 @@
               const i2 = new Image();
               i2.onload = () => {
                 loadedAssets.push({
-                  img: i2,
-                  src,
-                  name: p.name,
-                  defS: p.s,
-                  defO: p.o,
-                  gw: p.gw,
-                  gh: p.gh,
-                  ox: p.ox,
-                  oy: p.oy
+                   img: i2,
+                   src,
+                   name: p.name,
+                   defS: p.s,
+                   defO: p.o,
+                   gw: p.gw,
+                   gh: p.gh,
+                   ox: p.ox,
+                   oy: p.oy
                 });
                 resolve();
               };
@@ -467,6 +527,12 @@
               const d = JSON.parse(LZString.decompressFromEncodedURIComponent(text));
               setMap(d.m || []);
               setLines(d.l || []);
+              if (d.g && Array.isArray(d.g)) {
+                setGroupNames(d.g);
+              } else {
+                setGroupNames(["グループA", "グループB", "グループC"]);
+              }
+              setRoomPin(d.p || d.pin || "");
               if (d.c) {
                 setCoordMapping(d.c);
                 setCoordInput({
@@ -508,7 +574,7 @@
         lockedIdRef.current = null;
         showStatus("保存中...", "#ff9500", 0);
 
-        const rawStr = JSON.stringify({ m: map, l: lines, c: coordMapping });
+        const rawStr = JSON.stringify({ m: map, l: lines, c: coordMapping, g: groupNames, p: roomPin });
         const compressedStr = LZString.compressToEncodedURIComponent(rawStr);
 
         fetch(API_ENDPOINT, {
@@ -532,7 +598,7 @@
       // ローカル保存
       const saveLocalData = (roomName) => {
         const key = roomName ? `map_${roomName}` : "map_v293";
-        localStorage.setItem(key, JSON.stringify({ m: map, l: lines, c: coordMapping }));
+        localStorage.setItem(key, JSON.stringify({ m: map, l: lines, c: coordMapping, g: groupNames, p: roomPin }));
       };
 
       // ローカル読込
@@ -544,6 +610,12 @@
             const d = JSON.parse(s);
             setMap(d.m || []);
             setLines(d.l || []);
+            setRoomPin(d.p || d.pin || "");
+            if (d.g && Array.isArray(d.g)) {
+              setGroupNames(d.g);
+            } else {
+              setGroupNames(["グループA", "グループB", "グループC"]);
+            }
             if (d.c) {
               setCoordMapping(d.c);
               setCoordInput({
@@ -559,6 +631,10 @@
           } catch (e) {
             console.error("Local load error:", e);
           }
+        } else {
+          setMap([]);
+          setLines([]);
+          setRoomPin("");
         }
       };
 
@@ -737,6 +813,36 @@
         saveLocalData();
       };
 
+      // 建物を指定グループに設定
+      const updateItemGroup = (groupIdx) => {
+        if (isEditLocked || selIdx === -1) return;
+        setMap((prev) => {
+          const next = [...prev];
+          next[selIdx] = { ...next[selIdx], groupIdx: groupIdx };
+          return next;
+        });
+        setTimeout(() => {
+          saveLocalData(currentRoomName);
+        }, 50);
+      };
+
+      // グループ名変更
+      const renameGroup = (idx, newName) => {
+        if (isEditLocked) return;
+        setGroupNames((prev) => {
+          const next = [...prev];
+          next[idx] = newName;
+          return next;
+        });
+      };
+
+      // グループ名変更時に自動セーブ
+      useEffect(() => {
+        if (groupNames.length > 0) {
+          saveLocalData(currentRoomName);
+        }
+      }, [groupNames]);
+
       // マップ全初期化
       const handleClearAll = () => {
         if (isEditLocked) return;
@@ -752,6 +858,18 @@
           showToast("すべての配置をクリアしました");
           saveLocalData();
         }
+      };
+
+      // すべての建物のグループ分けを一括解除
+      const clearAllGroups = () => {
+        if (isEditLocked) return;
+        setMap((prev) => {
+          return prev.map((d) => ({ ...d, groupIdx: undefined }));
+        });
+        showToast("すべてのグループ分けを一括解除しました");
+        setTimeout(() => {
+          saveLocalData(currentRoomName);
+        }, 50);
       };
 
       // コピー動作
@@ -959,21 +1077,36 @@
           const fVal = 9.5 * d.s;
           const pVal = 3.2 * d.s;
           const rVal = 2.2 * d.s;
-          ctx.font = `bold ${fVal}px sans-serif`;
+          
+          // クロスプラットフォームなフォールバックを考慮した強固なシステムフォントスタック
+          ctx.font = `bold ${fVal}px system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif`;
           const pos = toS(d.x + a.gw / 2, d.y + a.gh / 2);
-          const txtW = ctx.measureText(d.mem).width;
+          
+          // 目に見えない制御文字や異体字セレクタ、双方向テキスト/RTL反転制御文字などを徹底的に消去
+          const cleanName = d.mem
+            .replace(/[\uFE00-\uFE0F\u200B-\u200D\u200E\u200F\uFEFF\u202A-\u202E\u2066-\u2069]/g, "")
+            .replace(/[\u{E0100}-\u{E01EF}]/gu, "")
+            .trim();
+
+          const txtW = ctx.measureText(cleanName).width;
           const bgW = txtW + pVal * 2;
           const bgH = fVal + pVal;
 
-          ctx.fillStyle = "rgba(0,0,0,0.8)";
+          // 所属グループに応じたバッジの背景色（透明度 0.85）
+          let badgeColor = "rgba(0,0,0,0.85)"; // 未所属（デフォルト）
+          if (d.groupIdx === 0) badgeColor = "rgba(220,38,38,0.95)"; // グループ1: 赤
+          else if (d.groupIdx === 1) badgeColor = "rgba(29,78,216,0.95)"; // グループ2: 青
+          else if (d.groupIdx === 2) badgeColor = "rgba(5,150,105,0.95)"; // グループ3: 緑
+
+          ctx.fillStyle = badgeColor;
           ctx.beginPath();
           ctx.roundRect(pos.x - bgW / 2, pos.y - bgH / 2, bgW, bgH, rVal);
           ctx.fill();
 
           ctx.fillStyle = "#fff";
-          ctx.textAlign = "center";
+          ctx.textAlign = "left"; // centerからleftに変更し、描画開始位置を明示的に指定することで、左側の余白を常にpVal(パディング)に完全固定
           ctx.textBaseline = "middle";
-          ctx.fillText(d.mem, pos.x, pos.y);
+          ctx.fillText(cleanName, pos.x - txtW / 2, pos.y);
           ctx.restore();
         });
 
@@ -1008,12 +1141,6 @@
           ctx.lineTo(pE.x, pE.y);
           ctx.closePath();
           ctx.stroke();
-
-          ctx.fillStyle = "#ff3b30";
-          const pinCenter = toS(gx + 0.5, gy + 0.5);
-          ctx.beginPath();
-          ctx.arc(pinCenter.x, pinCenter.y - 12 / camRef.current.z, 5 / camRef.current.z, 0, Math.PI * 2);
-          ctx.fill();
         }
 
         // 8. 座標設定用の基準点(L字型に連なった3マス)の描画
@@ -1104,7 +1231,7 @@
       // 依存更新
       useEffect(() => {
         drawMap();
-      }, [map, lines, selIdx, activeAsset, selectedGrid, coordMapping, isCoordSettingMode, assets]);
+      }, [map, lines, selIdx, activeAsset, selectedGrid, coordMapping, isCoordSettingMode, assets, groupNames]);
 
       const zoom = (scaleChange, centerX, centerY) => {
         const newZ = Math.min(Math.max(camRef.current.z * scaleChange, 0.1), 5);
@@ -1533,7 +1660,13 @@
           {/* ボトムパネル (各種操作スライダー、折りたたみ可能トレイ、モード選択) */}
           <div 
             id="bot-panel" 
-            className={`bg-white/98 border-t border-gray-300 px-3 pb-2 pt-0 box-border z-[100] flex flex-col gap-1.5 shrink-0 shadow-lg transition-all duration-300 ${isBotPanelCollapsed ? "h-[45px]" : "h-[228px] sm:h-[228px]"}`}
+            className={`bg-white/98 border-t border-gray-300 px-3 pb-2 pt-0 box-border z-[100] flex flex-col gap-1.5 shrink-0 shadow-lg transition-all duration-300 ${
+              isBotPanelCollapsed 
+                ? "h-[45px]" 
+                : selIdx !== -1 
+                ? "h-[295px] sm:h-[295px]" 
+                : "h-[228px] sm:h-[228px]"
+            }`}
           >
             {/* 折りたたみトグル用のヘッダーバー */}
             <div 
@@ -1703,6 +1836,63 @@
 
                 {/* モード切り替えパネル */}
                 <div className="flex-1 flex flex-col gap-1 justify-start overflow-hidden">
+                  {/* グループ選択 & グループ名編集コントロール */}
+                  {selIdx !== -1 && map[selIdx] && (
+                    <div className="flex flex-col gap-1 border-b border-gray-100 pb-1.5 mb-1">
+                      <div className="flex items-center justify-between text-[9px] sm:text-[10px] font-bold text-gray-500">
+                        <span className="truncate">グループ設定（枠内入力で名称変更）</span>
+                        <button
+                          onClick={clearAllGroups}
+                          disabled={isEditLocked}
+                          className="text-[8px] sm:text-[9px] text-red-500 hover:text-red-600 active:text-red-700 font-bold bg-red-50 hover:bg-red-100 border border-red-200 rounded px-1 py-0.5 cursor-pointer disabled:opacity-50 transition-colors whitespace-nowrap shrink-0"
+                          title="すべての建物のグループ所属を一括で全解除します"
+                        >
+                          一括解除
+                        </button>
+                      </div>
+                      <div className="flex gap-1 items-center justify-between">
+                        {/* 解除（未所属）ボタン */}
+                        <button
+                          onClick={() => updateItemGroup(-1)}
+                          className={`h-7 px-1.5 text-[9px] sm:text-[10px] font-bold rounded border transition-all cursor-pointer ${
+                            map[selIdx].groupIdx === undefined || map[selIdx].groupIdx === -1
+                              ? "bg-slate-700 text-white border-slate-700"
+                              : "bg-white text-slate-700 border-gray-300 hover:bg-gray-50"
+                          }`}
+                        >
+                          解除
+                        </button>
+                        {/* 3つのグループの選択・編集ボタン */}
+                        {groupNames.map((gName, idx) => {
+                          const isSelected = map[selIdx].groupIdx === idx;
+                          const colorClasses = [
+                            isSelected ? "bg-red-500 text-white border-red-500" : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100/50",
+                            isSelected ? "bg-blue-500 text-white border-blue-500" : "bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-100/50",
+                            isSelected ? "bg-emerald-500 text-white border-emerald-500" : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100/50",
+                          ];
+                          return (
+                            <div key={idx} className="flex items-center gap-0.5 flex-1 min-w-0">
+                              <button
+                                onClick={() => updateItemGroup(idx)}
+                                className={`h-7 flex-1 text-[9px] sm:text-[10px] font-bold rounded border transition-all truncate cursor-pointer ${colorClasses[idx]}`}
+                                title={`${gName} に設定`}
+                              >
+                                {gName}
+                              </button>
+                              <input
+                                type="text"
+                                value={gName}
+                                onChange={(e) => renameGroup(idx, e.target.value)}
+                                className="w-8 sm:w-12 h-7 text-[8px] sm:text-[9px] font-bold border border-gray-300 rounded px-0.5 text-center focus:outline-none focus:ring-1 focus:ring-[#007aff] bg-white text-gray-700 shrink-0 font-sans"
+                                placeholder={`G${idx + 1}`}
+                                title="グループ名を編集"
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                   {/* 任意座標登録とセーブボタン */}
                   <div className="flex gap-1 w-full">
                     <button 
@@ -1737,6 +1927,16 @@
                     >
                       {isEditLocked ? "🔒" : "🔓"}
                     </button>
+
+                    {!isEditLocked && (
+                      <button
+                        onClick={changePin}
+                        className="h-7 sm:h-8 px-1.5 sm:px-2 bg-yellow-50 hover:bg-yellow-100 border border-amber-300 text-amber-700 rounded-md text-[9px] sm:text-[10px] font-bold flex items-center gap-0.5 sm:gap-1 transition-all cursor-pointer whitespace-nowrap shadow-sm animate-fade-in"
+                        title={roomPin ? "PINの変更" : "PINの新規登録"}
+                      >
+                        🔑 {roomPin ? "PIN変更" : "PIN設定"}
+                      </button>
+                    )}
 
                     <button 
                       onClick={() => !isEditLocked && setMode("move")}
